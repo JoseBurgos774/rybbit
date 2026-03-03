@@ -129,11 +129,9 @@ export async function getUserHasAccessToSitePublic(
     return true;
   }
 
-  const [sites, isPublic] = await Promise.all([
-    getSitesUserHasAccessTo(req),
-    isSitePublic(siteId),
-  ]);
-  return sites.some((site) => site.siteId === Number(siteId)) || isPublic;
+  // Check if user has access via session
+  const sites = await getSitesUserHasAccessTo(req);
+  return sites.some((site) => site.siteId === Number(siteId));
 }
 
 export async function getUserHasAccessToSite(
