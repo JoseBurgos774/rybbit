@@ -153,6 +153,33 @@ class SiteConfig {
   }
 
   /**
+   * Validate an API key and return the associated siteId if valid
+   * Returns null if the API key is invalid or not found
+   */
+  validateApiKey(apiKey: string): number | null {
+    if (!apiKey || !apiKey.startsWith("rb_")) {
+      return null;
+    }
+
+    for (const [siteId, config] of this.siteConfigMap.entries()) {
+      if (config.apiKey === apiKey) {
+        return siteId;
+      }
+    }
+
+    return null;
+  }
+
+  /**
+   * Check if an API key is valid for a specific site
+   */
+  isApiKeyValidForSite(apiKey: string, siteId: string | number): boolean {
+    const numericSiteId = Number(siteId);
+    const config = this.siteConfigMap.get(numericSiteId);
+    return config?.apiKey === apiKey && apiKey !== null && apiKey !== undefined;
+  }
+
+  /**
    * Add a new site to the cache
    */
   addSite(siteId: number, config: SiteConfigData): void {

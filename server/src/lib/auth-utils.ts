@@ -146,3 +146,34 @@ export async function getUserHasAdminAccessToSite(
   const sites = await getSitesUserHasAccessTo(req, true);
   return sites.some((site) => site.siteId === Number(siteId));
 }
+
+/**
+ * Check if the request has valid API key authentication for a specific site
+ * This is used for GET endpoints that allow API key access
+ */
+export function hasApiKeyAccessToSite(
+  req: FastifyRequest,
+  siteId: string | number
+): boolean {
+  if (!req.apiKeyAuth) {
+    return false;
+  }
+  return req.apiKeyAuth.siteId === Number(siteId);
+}
+
+/**
+ * Check if user has access to site via session OR API key
+ * Use this for analytics endpoints that should support both auth methods
+ */
+export async function getUserOrApiKeyHasAccessToSite(
+  req: FastifyRequest,
+  siteId: string | number
+): Promise<boolean> {
+  // First check API key auth (faster, no DB query)
+  if (hasApiKeyAccessToSite(req, siteId)) {
+    return true;
+  }
+  
+  // Fall back to session-based access check
+  return getUserHasAccessToSitePublic(req, siteId);
+}

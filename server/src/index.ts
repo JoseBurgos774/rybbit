@@ -94,7 +94,7 @@ server.register(cors, {
     // }
   },
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
-  allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
+  allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "X-API-Key"],
   credentials: true,
 });
 
@@ -201,6 +201,19 @@ server.addHook("onRequest", async (request, reply) => {
     if (siteId && (await isSitePublic(siteId))) {
       // Skip auth check for public sites
       return;
+    }
+
+    // Check for API key authentication (header or query param)
+    if (siteId) {
+      const apiKey =
+        (request.headers["x-api-key"] as string) ||
+        (request.query as any)?.api_key;
+
+      if (apiKey && siteConfig.isApiKeyValidForSite(apiKey, siteId)) {
+        // Valid API key for this site - allow access without session
+        request.apiKeyAuth = { siteId: Number(siteId), apiKey };
+        return;
+      }
     }
   }
 
@@ -341,5 +354,6 @@ start();
 declare module "fastify" {
   interface FastifyRequest {
     user?: any; // Or define a more specific user type
+    apiKeyAuth?: { siteId: number; apiKey: string }; // API key authentication info
   }
 }
