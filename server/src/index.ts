@@ -162,6 +162,7 @@ const ANALYTICS_ROUTES = [
   "/api/users/",
   "/api/user/info/",
   "/api/user/session-count/",
+  "/api/user/",
   "/api/live-session-locations/",
   "/api/funnels/",
   "/api/funnel/",

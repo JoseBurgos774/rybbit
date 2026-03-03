@@ -70,36 +70,54 @@ curl "https://tu-rybbit.com/api/overview/1?api_key=rb_tu_api_key_aqui&startDate=
 
 ## Endpoints Disponibles
 
-Todos los endpoints GET de analytics funcionan con API key:
+Todos los endpoints GET de analytics funcionan con API key.
+
+### Endpoints sin parámetros obligatorios
 
 | Endpoint | Descripción |
 |----------|-------------|
 | `/api/overview/:site` | Métricas generales (sesiones, pageviews, usuarios) |
-| `/api/overview-bucketed/:site` | Métricas agrupadas por tiempo |
-| `/api/sessions/:site` | Lista de sesiones |
-| `/api/session/:sessionId/:site` | Detalle de una sesión |
 | `/api/users/:site` | Lista de usuarios |
-| `/api/user/:userId/sessions/:site` | Sesiones de un usuario |
 | `/api/user/info/:userId/:site` | Información de un usuario |
-| `/api/events/:site` | Lista de eventos |
 | `/api/events/names/:site` | Nombres de eventos únicos |
-| `/api/events/properties/:site` | Propiedades de eventos |
 | `/api/retention/:site` | Datos de retención |
 | `/api/funnels/:site` | Lista de embudos |
 | `/api/goals/:site` | Lista de objetivos |
 | `/api/journeys/:site` | Journeys de usuarios |
 | `/api/live-user-count/:site` | Usuarios en tiempo real |
-| `/api/live-session-locations/:site` | Ubicaciones en tiempo real |
 | `/api/page-titles/:site` | Títulos de páginas |
-| `/api/single-col/:site` | Métricas por dimensión |
 | `/api/error-names/:site` | Nombres de errores |
-| `/api/error-events/:site` | Eventos de error |
-| `/api/error-bucketed/:site` | Errores agrupados por tiempo |
 | `/api/performance/overview/:site` | Métricas de rendimiento |
-| `/api/performance/time-series/:site` | Rendimiento por tiempo |
-| `/api/performance/by-dimension/:site` | Rendimiento por dimensión |
 | `/api/session-replay/list/:site` | Lista de session replays |
-| `/api/session-replay/:sessionId/:site` | Eventos de session replay |
+
+### Endpoints con parámetros obligatorios
+
+| Endpoint | Parámetros Requeridos | Ejemplo |
+|----------|----------------------|---------|
+| `/api/overview-bucketed/:site` | `timeZone` | `?timeZone=America/Mexico_City` |
+| `/api/sessions/:site` | `page` (o `offset`) | `?page=1` |
+| `/api/session/:sessionId/:site` | - | `/api/session/abc123/2` |
+| `/api/user/:userId/sessions/:site` | - | `/api/user/124/sessions/2` |
+| `/api/events/:site` | `startDate`, `endDate` | `?startDate=2024-01-01&endDate=2024-01-31` |
+| `/api/events/properties/:site` | `eventName` | `?eventName=login_completed` |
+| `/api/live-session-locations/:site` | `minutes` | `?minutes=5` |
+| `/api/single-col/:site` | `parameter` | `?parameter=browser` |
+| `/api/error-events/:site` | `errorMessage` | `?errorMessage=TypeError` |
+| `/api/error-bucketed/:site` | `errorMessage`, `timeZone` | `?errorMessage=TypeError&timeZone=UTC` |
+| `/api/performance/time-series/:site` | `timeZone` | `?timeZone=America/Mexico_City` |
+| `/api/performance/by-dimension/:site` | `dimension` | `?dimension=browser` |
+| `/api/session-replay/:sessionId/:site` | - | `/api/session-replay/abc123/2` |
+
+### Parámetros comunes opcionales
+
+La mayoría de endpoints aceptan estos parámetros opcionales para filtrar datos:
+
+| Parámetro | Descripción | Ejemplo |
+|-----------|-------------|---------|
+| `startDate` | Fecha inicio (YYYY-MM-DD) | `2024-01-01` |
+| `endDate` | Fecha fin (YYYY-MM-DD) | `2024-01-31` |
+| `timeZone` | Zona horaria | `America/Mexico_City` |
+| `filters` | Filtros JSON | `[{"parameter":"browser","value":["Chrome"]}]` |
 
 ---
 

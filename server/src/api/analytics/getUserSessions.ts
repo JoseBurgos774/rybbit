@@ -45,11 +45,11 @@ export interface GetUserSessionsRequest {
     startDate: string;
     endDate: string;
     timeZone: string;
-    site: string;
     filters: string;
   };
   Params: {
     userId: string;
+    site: string;
   };
 }
 
@@ -57,8 +57,8 @@ export async function getUserSessions(
   req: FastifyRequest<GetUserSessionsRequest>,
   res: FastifyReply
 ) {
-  const { startDate, endDate, timeZone, site, filters } = req.query;
-  const userId = req.params.userId;
+  const { startDate, endDate, timeZone, filters } = req.query;
+  const { userId, site } = req.params;
 
   const userHasAccessToSite = await getUserHasAccessToSitePublic(req, site);
   if (!userHasAccessToSite) {

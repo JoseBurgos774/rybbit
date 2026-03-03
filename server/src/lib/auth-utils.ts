@@ -124,6 +124,11 @@ export async function getUserHasAccessToSitePublic(
   req: FastifyRequest,
   siteId: string | number
 ) {
+  // First check API key auth (faster, no DB query)
+  if (req.apiKeyAuth && req.apiKeyAuth.siteId === Number(siteId)) {
+    return true;
+  }
+
   const [sites, isPublic] = await Promise.all([
     getSitesUserHasAccessTo(req),
     isSitePublic(siteId),
