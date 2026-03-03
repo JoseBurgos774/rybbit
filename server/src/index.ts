@@ -199,11 +199,6 @@ server.addHook("onRequest", async (request, reply) => {
   if (ANALYTICS_ROUTES.some((route) => processedUrl.startsWith(route))) {
     const siteId = extractSiteId(processedUrl);
 
-    if (siteId && (await isSitePublic(siteId))) {
-      // Skip auth check for public sites
-      return;
-    }
-
     // Check for API key authentication (header or query param)
     if (siteId) {
       const apiKey =
@@ -216,6 +211,9 @@ server.addHook("onRequest", async (request, reply) => {
         return;
       }
     }
+    
+    // If no valid API key, continue to session check below
+    // (public sites will be checked in getUserHasAccessToSitePublic)
   }
 
   try {

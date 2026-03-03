@@ -94,19 +94,35 @@ Todos los endpoints GET de analytics funcionan con API key.
 
 | Endpoint | Parámetros Requeridos | Ejemplo |
 |----------|----------------------|---------|
-| `/api/overview-bucketed/:site` | `timeZone` | `?timeZone=America/Mexico_City` |
+| `/api/overview-bucketed/:site` | `bucket`, `timeZone`, `startDate`, `endDate` | `?bucket=day&timeZone=America/Mexico_City&startDate=2024-01-01&endDate=2024-01-31` |
 | `/api/sessions/:site` | `page` (o `offset`) | `?page=1` |
 | `/api/session/:sessionId/:site` | - | `/api/session/abc123/2` |
 | `/api/user/:userId/sessions/:site` | - | `/api/user/124/sessions/2` |
 | `/api/events/:site` | `startDate`, `endDate` | `?startDate=2024-01-01&endDate=2024-01-31` |
 | `/api/events/properties/:site` | `eventName` | `?eventName=login_completed` |
-| `/api/live-session-locations/:site` | `minutes` | `?minutes=5` |
+| `/api/live-session-locations/:site` | `time` | `?time=5` (minutos) |
 | `/api/single-col/:site` | `parameter` | `?parameter=browser` |
 | `/api/error-events/:site` | `errorMessage` | `?errorMessage=TypeError` |
-| `/api/error-bucketed/:site` | `errorMessage`, `timeZone` | `?errorMessage=TypeError&timeZone=UTC` |
-| `/api/performance/time-series/:site` | `timeZone` | `?timeZone=America/Mexico_City` |
+| `/api/error-bucketed/:site` | `bucket`, `errorMessage`, `timeZone`, `startDate`, `endDate` | `?bucket=day&errorMessage=TypeError&timeZone=UTC&startDate=2024-01-01&endDate=2024-01-31` |
+| `/api/performance/time-series/:site` | `bucket`, `timeZone`, `startDate`, `endDate` | `?bucket=day&timeZone=America/Mexico_City&startDate=2024-01-01&endDate=2024-01-31` |
 | `/api/performance/by-dimension/:site` | `dimension` | `?dimension=browser` |
 | `/api/session-replay/:sessionId/:site` | - | `/api/session-replay/abc123/2` |
+
+### Valores válidos para `bucket`
+
+El parámetro `bucket` define la granularidad temporal de los datos:
+
+| Valor | Descripción |
+|-------|-------------|
+| `minute` | Por minuto |
+| `five_minutes` | Cada 5 minutos |
+| `ten_minutes` | Cada 10 minutos |
+| `fifteen_minutes` | Cada 15 minutos |
+| `hour` | Por hora |
+| `day` | Por día |
+| `week` | Por semana |
+| `month` | Por mes |
+| `year` | Por año |
 
 ### Parámetros comunes opcionales
 
