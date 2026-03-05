@@ -31,6 +31,9 @@ import { getUserInfo } from "./api/analytics/getUserInfo.js";
 import { getUserSessionCount } from "./api/analytics/getUserSessionCount.js";
 import { getUserSessions } from "./api/analytics/getUserSessions.js";
 import { getUsers } from "./api/analytics/getUsers.js";
+import { getWeeklyActiveAccounts } from "./api/analytics/getWeeklyActiveAccounts.js";
+import { getOnboardingFunnel } from "./api/analytics/getOnboardingFunnel.js";
+import { getAbandonmentData } from "./api/analytics/getAbandonmentData.js";
 import { createGoal } from "./api/analytics/goals/createGoal.js";
 import { deleteGoal } from "./api/analytics/goals/deleteGoal.js";
 import { getGoals } from "./api/analytics/goals/getGoals.js";
@@ -181,6 +184,9 @@ const ANALYTICS_ROUTES = [
   "/api/error-events/",
   "/api/error-bucketed/",
   "/api/session-replay/",
+  "/api/analytics/weekly-active/",
+  "/api/analytics/onboarding-funnel/",
+  "/api/abandonment-data/",
 ];
 
 server.addHook("onRequest", async (request, reply) => {
@@ -278,6 +284,11 @@ server.put("/api/goal/update", updateGoal);
 server.get("/api/events/names/:site", getEventNames);
 server.get("/api/events/properties/:site", getEventProperties);
 server.get("/api/org-event-count/:organizationId", getOrgEventCount);
+server.get("/api/abandonment-data/:site", getAbandonmentData);
+
+// Marketing Analytics
+server.get("/api/analytics/weekly-active/:site", getWeeklyActiveAccounts);
+server.get("/api/analytics/onboarding-funnel/:site", getOnboardingFunnel);
 
 // Performance Analytics
 server.get("/api/performance/overview/:site", getPerformanceOverview);
@@ -289,6 +300,7 @@ server.post("/api/session-replay/record/:site", recordSessionReplay);
 server.get("/api/session-replay/list/:site", getSessionReplays);
 server.get("/api/session-replay/:sessionId/:site", getSessionReplayEvents);
 
+// ...
 // Administrative
 server.get("/api/config", getConfig);
 server.post("/api/add-site", addSite);
