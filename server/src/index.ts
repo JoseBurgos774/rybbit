@@ -186,7 +186,7 @@ const ANALYTICS_ROUTES = [
   "/api/session-replay/",
   "/api/analytics/weekly-active/",
   "/api/analytics/onboarding-funnel/",
-  "/api/abandonment-data/",
+  "/api/analytics/abandonment-data/",
 ];
 
 server.addHook("onRequest", async (request, reply) => {
