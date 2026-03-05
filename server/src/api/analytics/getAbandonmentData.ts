@@ -69,9 +69,10 @@ export async function getAbandonmentData(
         props['onboarding_mode'] as onboarding_mode,
         toInt32OrNull(props['total_steps']) as total_steps,
         timestamp as abandoned_at,
-        ROUND(
-          toInt32OrNull(props['last_step_number']) * 100.0 / 
-          toInt32OrNull(props['total_steps'])
+        if(
+          toInt32OrNull(props['total_steps']) > 0,
+          ROUND(toInt32OrNull(props['last_step_number']) * 100.0 / toInt32OrNull(props['total_steps'])),
+          0
         ) as progress_percentage
       FROM events
       WHERE ${whereClause}
