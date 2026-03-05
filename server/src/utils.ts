@@ -154,7 +154,14 @@ export const extractSiteId = (path: string) => {
   // /route/:site
   // /route/:sessionId/:site
   // /route/:userId/:site
+  // /api/analytics/user-onboarding-events/:site/:user_id
   const segments = pathWithoutQuery.split("/").filter(Boolean);
+  
+  // Special case for user-onboarding-events: site is second to last
+  if (segments.includes("user-onboarding-events") && segments.length >= 2) {
+    return segments[segments.length - 2];
+  }
+  
   if (segments.length >= 2) {
     return segments[segments.length - 1];
   }
