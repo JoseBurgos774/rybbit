@@ -34,6 +34,7 @@ import { getUsers } from "./api/analytics/getUsers.js";
 import { getWeeklyActiveAccounts } from "./api/analytics/getWeeklyActiveAccounts.js";
 import { getOnboardingFunnel } from "./api/analytics/getOnboardingFunnel.js";
 import { getAbandonmentData } from "./api/analytics/getAbandonmentData.js";
+import { getUserOnboardingEvents } from "./api/analytics/getUserOnboardingEvents.js";
 import { createGoal } from "./api/analytics/goals/createGoal.js";
 import { deleteGoal } from "./api/analytics/goals/deleteGoal.js";
 import { getGoals } from "./api/analytics/goals/getGoals.js";
@@ -187,6 +188,7 @@ const ANALYTICS_ROUTES = [
   "/api/analytics/weekly-active/",
   "/api/analytics/onboarding-funnel/",
   "/api/analytics/abandonment-data/",
+  "/api/analytics/user-onboarding-events/",
 ];
 
 server.addHook("onRequest", async (request, reply) => {
@@ -288,6 +290,7 @@ server.get("/api/org-event-count/:organizationId", getOrgEventCount);
 server.get("/api/analytics/weekly-active/:site", getWeeklyActiveAccounts);
 server.get("/api/analytics/onboarding-funnel/:site", getOnboardingFunnel);
 server.get("/api/analytics/abandonment-data/:site", getAbandonmentData);
+server.get("/api/analytics/user-onboarding-events/:site/:user_id", getUserOnboardingEvents);
 
 // Performance Analytics
 server.get("/api/performance/overview/:site", getPerformanceOverview);

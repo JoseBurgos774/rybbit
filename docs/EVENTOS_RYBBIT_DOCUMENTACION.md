@@ -1002,9 +1002,9 @@ Respuesta JSON con datos agregados
 **Query a Rybbit (ClickHouse):**
 
 ```bash
-# Obtener todos los eventos de onboarding del usuario 442
+# Obtener datos de abandono del usuario 442
 curl -H "X-API-Key: rb_your_api_key" \
-  "https://api-rybbit.nexgen.systems/api/analytics/events?site=2&filters=user_id:442&event_name:onboarding_*"
+  "https://api-rybbit.nexgen.systems/api/analytics/abandonment-data/2?user_id=442"
 ```
 
 **Respuesta esperada:**
@@ -1012,251 +1012,87 @@ curl -H "X-API-Key: rb_your_api_key" \
 {
   "data": [
     {
-      "event_name": "onboarding_started",
       "user_id": "442",
-      "timestamp": "2026-02-15T10:30:00Z",
-      "properties": {
-        "total_steps": 11,
-        "onboarding_mode": "manual"
-      }
-    },
-    {
-      "event_name": "onboarding_step_completed",
-      "user_id": "442",
-      "timestamp": "2026-02-15T10:35:00Z",
-      "properties": {
-        "step_number": 0,
-        "step_name": "Restaurante",
-        "total_steps": 11
-      }
-    },
-    {
-      "event_name": "onboarding_step_completed",
-      "user_id": "442",
-      "timestamp": "2026-02-15T10:42:00Z",
-      "properties": {
-        "step_number": 1,
-        "step_name": "Sucursal",
-        "total_steps": 11
-      }
-    },
-    {
-      "event_name": "onboarding_abandoned",
-      "user_id": "442",
-      "timestamp": "2026-02-15T10:50:00Z",
-      "properties": {
-        "last_step_number": 2,
-        "last_step_name": "Horarios",
-        "duration_ms": 1200000,
-        "onboarding_mode": "manual",
-        "total_steps": 11
-      }
+      "last_step_number": 2,
+      "last_step_name": "Horarios",
+      "duration_ms": 1200000,
+      "onboarding_mode": "manual",
+      "total_steps": 11,
+      "abandoned_at": "2026-02-15T10:50:00Z",
+      "progress_percentage": 18
     }
-  ]
+  ],
+  "pagination": {
+    "total": 1,
+    "limit": 100,
+    "offset": 0,
+    "pages": 1
+  },
+  "meta": {
+    "site_id": "2",
+    "filtered_by_user": true,
+    "date_range": null
+  }
 }
 ```
 
 #### 2. Analizar el abandono
 
 **Interpretación:**
-- Usuario 442 completó 2 pasos (Restaurante, Sucursal)
-- Abandonó en el paso 3 (Horarios)
+- Usuario 442 abandonó en el paso "Horarios" (paso 2 de 11)
+- Completó 18% del onboarding
 - Pasó 20 minutos en el onboarding
 - Modo: manual
 
-#### 3. Crear endpoint en EasyOrder para obtener datos de abandono
+#### 3. Usar datos de abandono en m8n
 
-**Crear nuevo endpoint:** `GET /api/onboarding/abandonment-data/:user_id`
+Con los datos obtenidos del endpoint `/api/analytics/abandonment-data/:site`, puedes crear un workflow en m8n para:
 
-```typescript
-// En easyorder-backend/src/routes/onboarding.ts
+1. **Obtener usuarios abandonados:**
+   ```bash
+   curl -H "X-API-Key: rb_your_api_key" \
+     "https://api-rybbit.nexgen.systems/api/analytics/abandonment-data/2?limit=100"
+   ```
 
-import axios from 'axios';
+2. **Filtrar por paso específico:**
+   - Usuarios que abandonaron en "Horarios" (paso 2)
+   - Usuarios con progreso < 30%
 
-export async function getAbandonmentData(userId: string) {
-  const rybbitApiKey = process.env.RYBBIT_API_KEY;
-  const siteId = process.env.RYBBIT_SITE_ID;
+3. **Enviar mensaje personalizado:**
+   - Usar WhatsApp, Email o SMS
+   - Incluir nombre del paso donde abandonaron
+   - Ofrecer link para reanudar onboarding
 
-  try {
-    // Obtener eventos de onboarding del usuario
-    const response = await axios.get(
-      `https://api-rybbit.nexgen.systems/api/analytics/events`,
-      {
-        headers: {
-          'X-API-Key': rybbitApiKey,
-        },
-        params: {
-          site: siteId,
-          filters: `user_id:${userId}`,
-          event_name: 'onboarding_*',
-        },
-      }
-    );
+4. **Rastrear re-engagement:**
+   - Registrar si el usuario retomó el onboarding
+   - Medir tasa de éxito de re-engagement
 
-    const events = response.data.data || [];
+---
 
-    // Buscar el evento de abandono
-    const abandonmentEvent = events.find(
-      (e: any) => e.event_name === 'onboarding_abandoned'
-    );
+## Resumen de Implementación
 
-    if (!abandonmentEvent) {
-      return {
-        status: 'completed_or_in_progress',
-        user_id: userId,
-      };
-    }
+✅ **Eventos implementados:**
+- `onboarding_started` - Inicio del onboarding
+- `onboarding_step_completed` - Completación de cada paso
+- `onboarding_completed` - Completación del onboarding
+- `onboarding_abandoned` - Abandono del onboarding
+- `data_imported_success` - Importación de clientes exitosa
+- `report_generated` - Generación de reportes
+- `shared_link_created` - Creación de links compartidos
+- `invite_sent` - Envío de invitaciones
 
-    // Extraer datos relevantes
-    const {
-      last_step_number,
-      last_step_name,
-      duration_ms,
-      onboarding_mode,
-      total_steps,
-    } = abandonmentEvent.properties;
+✅ **Endpoints Rybbit creados:**
+- `GET /api/analytics/weekly-active/:site` - Cuentas activas semanales
+- `GET /api/analytics/onboarding-funnel/:site` - Embudo de onboarding
+- `GET /api/analytics/abandonment-data/:site` - Datos de abandono
 
-    // Obtener datos del usuario
-    const usuario = await db.usuarios.findById(userId);
+✅ **Autenticación:**
+- API Key authentication en todos los endpoints
+- Soporte para header `X-API-Key` y query parameter `api_key`
 
-    return {
-      status: 'abandoned',
-      user_id: userId,
-      email: usuario.email,
-      nombre: usuario.nombre,
-      last_step_number,
-      last_step_name,
-      duration_minutes: Math.round(duration_ms / 60000),
-      onboarding_mode,
-      total_steps,
-      steps_completed: last_step_number,
-      progress_percentage: Math.round((last_step_number / total_steps) * 100),
-      abandoned_at: abandonmentEvent.timestamp,
-    };
-  } catch (error) {
-    console.error('Error fetching abandonment data:', error);
-    throw error;
-  }
-}
-
-// Endpoint REST
-app.get('/api/onboarding/abandonment-data/:user_id', async (req, res) => {
-  try {
-    const data = await getAbandonmentData(req.params.user_id);
-    res.json(data);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-```
-
-#### 4. Integración con m8n
-
-**Crear workflow en m8n:**
-
-```yaml
-# m8n/workflows/onboarding-abandonment-reengagement.yaml
-
-name: Onboarding Abandonment Re-engagement
-description: Envía mensaje personalizado a usuarios que abandonaron onboarding
-
-triggers:
-  - type: schedule
-    cron: "0 9 * * *"  # Diariamente a las 9 AM
-
-actions:
-  - name: Get Abandoned Users
-    type: http
-    config:
-      url: "https://api-easyorder.nexgen.systems/api/onboarding/abandonment-data"
-      method: GET
-      headers:
-        Authorization: "Bearer ${EASYORDER_API_KEY}"
-
-  - name: Filter Users
-    type: filter
-    config:
-      condition: "status == 'abandoned' AND progress_percentage < 50"
-
-  - name: Send WhatsApp Message
-    type: whatsapp
-    config:
-      to: "${usuario.phone}"
-      template: "onboarding_abandonment_reengagement"
-      variables:
-        nombre: "${usuario.nombre}"
-        last_step: "${last_step_name}"
-        progress: "${progress_percentage}"
-        link: "https://app.easyorder.app/onboarding/resume?user_id=${user_id}&step=${last_step_number}"
-
-  - name: Send Email
-    type: email
-    config:
-      to: "${usuario.email}"
-      subject: "Hola ${usuario.nombre}, te ayudamos a completar tu configuración"
-      template: "onboarding_abandonment_email"
-      variables:
-        nombre: "${usuario.nombre}"
-        last_step: "${last_step_name}"
-        duration_minutes: "${duration_minutes}"
-        progress: "${progress_percentage}"
-
-  - name: Track Re-engagement Attempt
-    type: http
-    config:
-      url: "https://api-rybbit.nexgen.systems/api/events"
-      method: POST
-      headers:
-        X-API-Key: "${RYBBIT_API_KEY}"
-      body:
-        event_name: "reengagement_message_sent"
-        user_id: "${user_id}"
-        properties:
-          abandonment_step: "${last_step_name}"
-          message_type: "whatsapp_and_email"
-          progress_percentage: "${progress_percentage}"
-```
-
-#### 5. Ejemplo de datos para usuario 442
-
-**Respuesta del endpoint:**
-```json
-{
-  "status": "abandoned",
-  "user_id": "442",
-  "email": "jose@restaurante.com",
-  "nombre": "José García",
-  "last_step_number": 2,
-  "last_step_name": "Horarios",
-  "duration_minutes": 20,
-  "onboarding_mode": "manual",
-  "total_steps": 11,
-  "steps_completed": 2,
-  "progress_percentage": 18,
-  "abandoned_at": "2026-02-15T10:50:00Z"
-}
-```
-
-**Mensaje WhatsApp generado:**
-```
-Hola José, 👋
-
-Vimos que completaste el 18% de tu configuración en EasyOrder.
-
-Te quedaste en el paso "Horarios" hace 3 días.
-
-¿Necesitas ayuda? Aquí te dejamos el link para continuar:
-👉 https://app.easyorder.app/onboarding/resume?user_id=442&step=2
-
-¡Solo faltan 9 pasos más para que tu restaurante esté listo! 🚀
-```
-
-**Email generado:**
-```
-Asunto: Hola José, te ayudamos a completar tu configuración
-
-Cuerpo:
-Hola José,
+✅ **Integración con m8n:**
+- Datos disponibles para automatizar campañas de re-engagement
+- Información detallada de abandono para personalización de mensajes
 
 Notamos que iniciaste la configuración de tu restaurante en EasyOrder hace 3 días, 
 pero te quedaste en el paso "Horarios" (completaste el 18% del proceso).
