@@ -284,11 +284,10 @@ server.put("/api/goal/update", updateGoal);
 server.get("/api/events/names/:site", getEventNames);
 server.get("/api/events/properties/:site", getEventProperties);
 server.get("/api/org-event-count/:organizationId", getOrgEventCount);
-server.get("/api/abandonment-data/:site", getAbandonmentData);
-
 // Marketing Analytics
 server.get("/api/analytics/weekly-active/:site", getWeeklyActiveAccounts);
 server.get("/api/analytics/onboarding-funnel/:site", getOnboardingFunnel);
+server.get("/api/analytics/abandonment-data/:site", getAbandonmentData);
 
 // Performance Analytics
 server.get("/api/performance/overview/:site", getPerformanceOverview);
