@@ -1,6 +1,7 @@
-import { FastifyRequest, FastifyReply } from "fastify";
+import { FastifyReply, FastifyRequest } from "fastify";
+import { clickhouse } from "../../db/clickhouse/clickhouse.js";
 import { getUserOrApiKeyHasAccessToSite } from "../../lib/auth-utils.js";
-import { getClickhouseClient } from "../../lib/clickhouse.js";
+import { processResults } from "./utils.js";
 
 interface AbandonmentRecord {
   user_id: string;
@@ -14,47 +15,51 @@ interface AbandonmentRecord {
 }
 
 export async function getAbandonmentData(
-  request: FastifyRequest,
-  reply: FastifyReply
+  req: FastifyRequest,
+  res: FastifyReply
 ) {
+  const { site } = req.params as { site: string };
+  const queryParams = req.query as any;
+  const user_id = queryParams.user_id as string | undefined;
+  const startDate = queryParams.startDate as string | undefined;
+  const endDate = queryParams.endDate as string | undefined;
+  const limitParam = queryParams.limit ? parseInt(queryParams.limit as string) : 100;
+  const offsetParam = queryParams.offset ? parseInt(queryParams.offset as string) : 0;
+
+  const limit = Math.max(1, Math.min(1000, limitParam || 100));
+  const offset = Math.max(0, offsetParam || 0);
+
   try {
-    const siteId = request.params.site as string;
-    const userId = request.query.user_id as string | undefined;
-    const startDate = request.query.startDate as string | undefined;
-    const endDate = request.query.endDate as string | undefined;
-    const limit = parseInt(request.query.limit as string) || 100;
-    const offset = parseInt(request.query.offset as string) || 0;
-
-    // Validar acceso
-    const hasAccess = await getUserOrApiKeyHasAccessToSite(request, siteId);
-    if (!hasAccess) {
-      return reply.status(403).send({ error: "Unauthorized" });
-    }
-
-    const client = await getClickhouseClient();
 
     // Construir query base
     let whereConditions = [
-      `site_id = ${siteId}`,
+      `site_id = {siteId:Int32}`,
       `event_name = 'onboarding_abandoned'`,
     ];
 
-    // Filtrar por usuario específico si se proporciona
-    if (userId) {
-      whereConditions.push(`user_id = '${userId}'`);
+    const params: Record<string, any> = {
+      siteId: Number(site),
+      limit,
+      offset,
+    };
+
+    if (user_id) {
+      whereConditions.push(`user_id = {userId:String}`);
+      params.userId = user_id;
     }
 
-    // Filtrar por rango de fechas
     if (startDate) {
-      whereConditions.push(`toDate(timestamp) >= '${startDate}'`);
+      whereConditions.push(`toDate(timestamp) >= {startDate:Date}`);
+      params.startDate = startDate;
     }
+
     if (endDate) {
-      whereConditions.push(`toDate(timestamp) <= '${endDate}'`);
+      whereConditions.push(`toDate(timestamp) <= {endDate:Date}`);
+      params.endDate = endDate;
     }
 
     const whereClause = whereConditions.join(" AND ");
 
-    // Query para obtener datos de abandono
     const query = `
       SELECT
         user_id,
@@ -71,7 +76,7 @@ export async function getAbandonmentData(
       FROM events
       WHERE ${whereClause}
       ORDER BY timestamp DESC
-      LIMIT ${limit} OFFSET ${offset}
+      LIMIT {limit:Int32} OFFSET {offset:Int32}
     `;
 
     // Query para contar total de registros
@@ -82,15 +87,23 @@ export async function getAbandonmentData(
     `;
 
     const [results, countResults] = await Promise.all([
-      client.query({ query }),
-      client.query({ query: countQuery }),
+      clickhouse.query({
+        query,
+        format: "JSONEachRow",
+        query_params: params,
+      }),
+      clickhouse.query({
+        query: countQuery,
+        format: "JSONEachRow",
+        query_params: params,
+      }),
     ]);
 
-    const data = await results.json<AbandonmentRecord[]>();
-    const countData = await countResults.json<{ total: number }[]>();
+    const data = await processResults<AbandonmentRecord>(results);
+    const countData = await processResults<{ total: number }>(countResults);
     const total = countData[0]?.total || 0;
 
-    return reply.send({
+    return res.send({
       data,
       pagination: {
         total,
@@ -99,13 +112,13 @@ export async function getAbandonmentData(
         pages: Math.ceil(total / limit),
       },
       meta: {
-        site_id: siteId,
-        filtered_by_user: userId ? true : false,
+        site_id: site,
+        filtered_by_user: user_id ? true : false,
         date_range: startDate || endDate ? { startDate, endDate } : null,
       },
     });
   } catch (error) {
-    console.error("Error in getAbandonmentData:", error);
-    return reply.status(500).send({ error: "Internal server error" });
+    console.error("Error fetching abandonment data:", error);
+    return res.status(500).send({ error: "Failed to fetch abandonment data" });
   }
 }
