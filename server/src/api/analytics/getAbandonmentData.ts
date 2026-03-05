@@ -63,15 +63,15 @@ export async function getAbandonmentData(
     const query = `
       SELECT
         user_id,
-        JSONExtractInt(props, 'last_step_number') as last_step_number,
-        JSONExtractString(props, 'last_step_name') as last_step_name,
-        JSONExtractInt(props, 'duration_ms') as duration_ms,
-        JSONExtractString(props, 'onboarding_mode') as onboarding_mode,
-        JSONExtractInt(props, 'total_steps') as total_steps,
+        toInt32OrNull(props['last_step_number']) as last_step_number,
+        props['last_step_name'] as last_step_name,
+        toInt32OrNull(props['duration_ms']) as duration_ms,
+        props['onboarding_mode'] as onboarding_mode,
+        toInt32OrNull(props['total_steps']) as total_steps,
         timestamp as abandoned_at,
         ROUND(
-          JSONExtractInt(props, 'last_step_number') * 100.0 / 
-          JSONExtractInt(props, 'total_steps')
+          toInt32OrNull(props['last_step_number']) * 100.0 / 
+          toInt32OrNull(props['total_steps'])
         ) as progress_percentage
       FROM events
       WHERE ${whereClause}
