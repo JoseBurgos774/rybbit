@@ -82,8 +82,8 @@ export async function getOnboardingFunnel(
   // Query for step completion breakdown
   const stepsQuery = `
     SELECT
-      JSONExtractString(props, 'step_name') as step_name,
-      JSONExtractInt(props, 'step_number') as step_number,
+      props.step_name as step_name,
+      toInt32OrNull(props.step_number) as step_number,
       COUNT(DISTINCT user_id) as users_count
     FROM events
     WHERE
@@ -98,8 +98,8 @@ export async function getOnboardingFunnel(
   // Query for abandonment by step
   const abandonmentByStepQuery = `
     SELECT
-      JSONExtractString(props, 'last_step_name') as step_name,
-      JSONExtractInt(props, 'last_step_number') as step_number,
+      props.last_step_name as step_name,
+      toInt32OrNull(props.last_step_number) as step_number,
       COUNT(DISTINCT user_id) as abandoned_count
     FROM events
     WHERE
