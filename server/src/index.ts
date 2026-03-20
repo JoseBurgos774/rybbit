@@ -194,6 +194,8 @@ const ANALYTICS_ROUTES = [
   "/api/analytics/user-onboarding-events/",
   "/api/analytics/export-csv/",
   "/api/analytics/summary/",
+  "/api/analytics/user-profiles/",
+  "/api/analytics/user/",
 ];
 
 server.addHook("onRequest", async (request, reply) => {
