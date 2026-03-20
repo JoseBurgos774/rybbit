@@ -26,6 +26,7 @@ GET /api/analytics/abandonment-data/:site
 - `user_id` (optional): ID del usuario específico para filtrar
 - `startDate` (optional): Fecha inicio en formato YYYY-MM-DD
 - `endDate` (optional): Fecha fin en formato YYYY-MM-DD
+- `unique_users` (optional): **`true` para obtener solo un registro por usuario** (el último abandono). Incluye campo `abandonment_count` con el número de veces que abandonó.
 - `limit` (optional): Número de registros a retornar (default: 100, max: 1000)
 - `offset` (optional): Offset para paginación (default: 0)
 
@@ -44,7 +45,34 @@ curl "https://api-rybbit.nexgen.systems/api/analytics/abandonment-data/2?api_key
 
 ## Ejemplos de Uso
 
-### 1. Obtener todos los abandonos del sitio
+### 1. Obtener usuarios únicos que abandonaron (recomendado para m8n)
+
+```bash
+# Solo un registro por usuario, con datos de contacto
+curl -H "X-API-Key: rb_your_api_key" \
+  "https://api-rybbit.nexgen.systems/api/analytics/abandonment-data/2?unique_users=true"
+```
+
+**Respuesta:**
+```json
+{
+  "data": [
+    {
+      "user_id": "693",
+      "email": "antonio_zamora@nexgen.mx",
+      "phone": null,
+      "name": "Luis Antonio Zamora López",
+      "last_step_number": 3,
+      "last_step_name": "Plantilla",
+      "abandonment_count": 7,
+      "progress_percentage": 60,
+      "abandoned_at": "2026-03-20 11:52:34"
+    }
+  ]
+}
+```
+
+### 2. Obtener todos los abandonos del sitio (incluye duplicados)
 
 ```bash
 curl -H "X-API-Key: rb_your_api_key" \

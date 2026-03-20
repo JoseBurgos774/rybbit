@@ -33,6 +33,7 @@ export async function getAbandonmentData(
   const user_id = queryParams.user_id as string | undefined;
   const startDate = queryParams.startDate as string | undefined;
   const endDate = queryParams.endDate as string | undefined;
+  const uniqueUsers = queryParams.unique_users === "true"; // Nuevo parámetro
   const limitParam = queryParams.limit ? parseInt(queryParams.limit as string) : 100;
   const offsetParam = queryParams.offset ? parseInt(queryParams.offset as string) : 0;
 
@@ -70,7 +71,30 @@ export async function getAbandonmentData(
 
     const whereClause = whereConditions.join(" AND ");
 
-    const query = `
+    // Query diferente si queremos usuarios únicos (solo el último abandono de cada usuario)
+    const query = uniqueUsers
+      ? `
+      SELECT
+        user_id,
+        argMax(JSONExtractInt(toString(props), 'last_step_number'), timestamp) as last_step_number,
+        argMax(JSONExtractString(toString(props), 'last_step_name'), timestamp) as last_step_name,
+        argMax(JSONExtractInt(toString(props), 'duration_ms'), timestamp) as duration_ms,
+        argMax(JSONExtractString(toString(props), 'onboarding_mode'), timestamp) as onboarding_mode,
+        argMax(JSONExtractInt(toString(props), 'total_steps'), timestamp) as total_steps,
+        max(timestamp) as abandoned_at,
+        COUNT(*) as abandonment_count,
+        if(
+          argMax(JSONExtractInt(toString(props), 'total_steps'), timestamp) > 0,
+          ROUND(argMax(JSONExtractInt(toString(props), 'last_step_number'), timestamp) * 100.0 / argMax(JSONExtractInt(toString(props), 'total_steps'), timestamp)),
+          0
+        ) as progress_percentage
+      FROM events
+      WHERE ${whereClause}
+      GROUP BY user_id
+      ORDER BY abandoned_at DESC
+      LIMIT {limit:Int32} OFFSET {offset:Int32}
+    `
+      : `
       SELECT
         user_id,
         JSONExtractInt(toString(props), 'last_step_number') as last_step_number,
@@ -91,7 +115,13 @@ export async function getAbandonmentData(
     `;
 
     // Query para contar total de registros
-    const countQuery = `
+    const countQuery = uniqueUsers
+      ? `
+      SELECT COUNT(DISTINCT user_id) as total
+      FROM events
+      WHERE ${whereClause}
+    `
+      : `
       SELECT COUNT(*) as total
       FROM events
       WHERE ${whereClause}
