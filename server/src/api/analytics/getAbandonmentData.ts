@@ -2,6 +2,10 @@ import { FastifyReply, FastifyRequest } from "fastify";
 import { clickhouse } from "../../db/clickhouse/clickhouse.js";
 import { getUserOrApiKeyHasAccessToSite } from "../../lib/auth-utils.js";
 import { processResults } from "./utils.js";
+import { getEasyOrderUsersByIds } from "../../db/easyorder/easyorder.js";
+import { db } from "../../db/postgres/postgres.js";
+import { trackedUserProfiles } from "../../db/postgres/schema.js";
+import { eq } from "drizzle-orm";
 
 interface AbandonmentRecord {
   user_id: string;
@@ -12,6 +16,12 @@ interface AbandonmentRecord {
   total_steps: number;
   abandoned_at: string;
   progress_percentage: number;
+}
+
+interface EnrichedAbandonmentRecord extends AbandonmentRecord {
+  email: string | null;
+  phone: string | null;
+  name: string | null;
 }
 
 export async function getAbandonmentData(
@@ -104,8 +114,50 @@ export async function getAbandonmentData(
     const countData = await processResults<{ total: number }>(countResults);
     const total = countData[0]?.total || 0;
 
+    // Enrich with contact data (email, phone, name)
+    const userIds = data.map((record) => record.user_id);
+    const siteId = Number(site);
+
+    // 1. Get from local tracked_user_profiles
+    const localProfiles = new Map<string, { email: string | null; phone: string | null; name: string | null }>();
+    if (userIds.length > 0) {
+      const profiles = await db
+        .select()
+        .from(trackedUserProfiles)
+        .where(eq(trackedUserProfiles.siteId, siteId));
+
+      for (const profile of profiles) {
+        if (userIds.includes(profile.userId)) {
+          localProfiles.set(profile.userId, {
+            email: profile.email,
+            phone: profile.phone,
+            name: profile.name,
+          });
+        }
+      }
+    }
+
+    // 2. For users without local profiles, fetch from EasyOrder
+    const userIdsWithoutProfiles = userIds.filter((id) => !localProfiles.has(id));
+    const easyOrderUsers = userIdsWithoutProfiles.length > 0
+      ? await getEasyOrderUsersByIds(userIdsWithoutProfiles)
+      : new Map();
+
+    // 3. Merge contact data into abandonment records
+    const enrichedData: EnrichedAbandonmentRecord[] = data.map((record) => {
+      const localProfile = localProfiles.get(record.user_id);
+      const easyOrderUser = easyOrderUsers.get(record.user_id);
+
+      return {
+        ...record,
+        email: localProfile?.email || easyOrderUser?.correo_electronico || null,
+        phone: localProfile?.phone || easyOrderUser?.telefono || null,
+        name: localProfile?.name || easyOrderUser?.nombre || null,
+      };
+    });
+
     return res.send({
-      data,
+      data: enrichedData,
       pagination: {
         total,
         limit,

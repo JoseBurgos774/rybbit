@@ -81,6 +81,9 @@ curl -H "X-API-Key: rb_your_api_key" \
   "data": [
     {
       "user_id": "442",
+      "email": "usuario@ejemplo.com",
+      "phone": "+5216871234567",
+      "name": "Juan Pérez",
       "last_step_number": 2,
       "last_step_name": "Horarios",
       "duration_ms": 1200000,
@@ -109,6 +112,9 @@ curl -H "X-API-Key: rb_your_api_key" \
 | Campo | Tipo | Descripción |
 |-------|------|-------------|
 | `user_id` | string | ID del usuario que abandonó |
+| `email` | string/null | **Correo electrónico del usuario** (desde EasyOrder DB) |
+| `phone` | string/null | **Teléfono del usuario** (cuando esté disponible) |
+| `name` | string/null | **Nombre del usuario** (desde EasyOrder DB) |
 | `last_step_number` | number | Número del último paso alcanzado (0-indexed) |
 | `last_step_name` | string | Nombre del paso donde abandonó |
 | `duration_ms` | number | Tiempo total en onboarding (milisegundos) |
@@ -116,6 +122,15 @@ curl -H "X-API-Key: rb_your_api_key" \
 | `total_steps` | number | Total de pasos en el flujo |
 | `abandoned_at` | string | Timestamp ISO del abandono |
 | `progress_percentage` | number | Porcentaje de progreso completado |
+
+### Fuentes de Datos de Contacto
+
+Los campos `email`, `phone` y `name` se obtienen de:
+
+1. **Tabla local `tracked_user_profiles`** - Datos enviados via `/api/identify`
+2. **BD de EasyOrder** - Consulta directa a la tabla `usuarios` (requiere `EASYORDER_DATABASE_URL`)
+
+Si no hay datos disponibles, los campos serán `null`.
 
 ## Casos de Uso
 
@@ -179,13 +194,27 @@ actions:
   - name: Send WhatsApp Message
     type: whatsapp
     config:
-      to: "${usuario.phone}"
+      # ✅ Ahora el teléfono viene directamente en la respuesta
+      to: "${phone}"
       template: "onboarding_abandonment_reengagement"
       variables:
-        nombre: "${usuario.nombre}"
+        # ✅ El nombre viene directamente en la respuesta
+        nombre: "${name}"
         last_step: "${last_step_name}"
         progress: "${progress_percentage}"
         link: "https://app.easyorder.app/onboarding/resume?user_id=${user_id}&step=${last_step_number}"
+
+  - name: Send Email (alternativo)
+    type: email
+    config:
+      # ✅ El email viene directamente en la respuesta
+      to: "${email}"
+      subject: "¡Continúa configurando tu restaurante!"
+      template: "onboarding_reminder"
+      variables:
+        nombre: "${name}"
+        last_step: "${last_step_name}"
+        progress: "${progress_percentage}"
 
   - name: Track Re-engagement
     type: http
@@ -198,7 +227,38 @@ actions:
         properties:
           abandonment_step: "${last_step_name}"
           progress_percentage: "${progress_percentage}"
+          contact_method: "whatsapp"
 ```
+
+### Ejemplo de Respuesta con Datos de Contacto
+
+```bash
+curl -H "X-API-Key: rb_your_api_key" \
+  "https://api-rybbit.nexgen.systems/api/analytics/abandonment-data/2?user_id=442"
+```
+
+**Respuesta:**
+```json
+{
+  "data": [
+    {
+      "user_id": "442",
+      "email": "juan.perez@gmail.com",
+      "phone": "+5216871234567",
+      "name": "Juan Pérez",
+      "last_step_number": 2,
+      "last_step_name": "Horarios",
+      "duration_ms": 1200000,
+      "onboarding_mode": "manual",
+      "total_steps": 11,
+      "abandoned_at": "2026-02-15T10:50:00Z",
+      "progress_percentage": 18
+    }
+  ]
+}
+```
+
+Ahora puedes usar directamente `${email}`, `${phone}` y `${name}` en tus workflows de m8n sin necesidad de consultar otra API.
 
 ## Códigos de Error
 
