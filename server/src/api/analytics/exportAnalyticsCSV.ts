@@ -99,62 +99,66 @@ export async function exportAnalyticsCSV(
     pastMinutesEnd,
   });
 
-  // Main analytics query - simplified user-level analytics
+  // Main analytics query - using subquery to avoid nested aggregation
   const query = `
     SELECT
       user_id,
-      
-      -- Total metrics
-      countIf(type = 'pageview') AS total_pageviews,
-      countIf(type = 'custom_event') AS total_events,
-      uniq(session_id) AS total_sessions,
-      
-      -- Is active user (more than 2 sessions)
-      IF(uniq(session_id) > 2, 1, 0) AS is_active_user,
-      IF(uniq(session_id) = 1, 1, 0) AS is_new_user,
-      IF(uniq(session_id) > 1, 1, 0) AS is_returning_user,
-      
-      -- Device info
-      anyLast(device_type) AS device_type,
-      anyLast(device_type) AS first_device_type,
-      anyLast(browser) AS browser,
-      anyLast(operating_system) AS operating_system,
-      concat(toString(anyLast(screen_width)), 'x', toString(anyLast(screen_height))) AS screen_dimensions,
-      
-      -- Location
-      anyLast(country) AS country,
-      anyLast(region) AS region,
-      anyLast(city) AS city,
-      
-      -- Traffic source
-      anyLast(referrer) AS first_referrer,
-      anyLast(channel) AS session_source,
-      
-      -- Pages
-      anyLast(pathname) AS entry_page,
-      anyLast(pathname) AS exit_page,
-      anyLast(pathname) AS top_page,
-      
-      -- Timestamps
-      formatDateTime(MIN(timestamp), '%Y-%m-%d %H:%M:%S') AS first_seen,
-      formatDateTime(MAX(timestamp), '%Y-%m-%d %H:%M:%S') AS last_seen,
-      
-      -- Session duration (approximate)
-      dateDiff('second', MIN(timestamp), MAX(timestamp)) / greatest(uniq(session_id), 1) AS avg_session_duration_seconds,
-      
-      -- Bounce and interaction rates (simplified)
+      total_pageviews,
+      total_events,
+      total_sessions,
+      if(total_sessions > 2, 1, 0) AS is_active_user,
+      if(total_sessions = 1, 1, 0) AS is_new_user,
+      if(total_sessions > 1, 1, 0) AS is_returning_user,
+      device_type,
+      device_type AS first_device_type,
+      browser,
+      operating_system,
+      concat(screen_width_str, 'x', screen_height_str) AS screen_dimensions,
+      country,
+      region,
+      city,
+      first_referrer,
+      session_source,
+      entry_page,
+      exit_page,
+      top_page,
+      first_seen,
+      last_seen,
+      total_duration_seconds AS avg_session_duration_seconds,
       0 AS bounce_rate,
-      IF(countIf(type = 'custom_event') > 0, 100, 0) AS interaction_rate,
-      countIf(type = 'custom_event') AS sessions_with_interaction,
-      countIf(type = 'pageview') AS pageviews_with_interaction
-      
-    FROM events
-    WHERE
-      site_id = {siteId:Int32}
-      ${filterStatement}
-      ${timeStatement}
-    GROUP BY user_id
-    ORDER BY MAX(timestamp) DESC
+      if(total_events > 0, 100, 0) AS interaction_rate,
+      total_events AS sessions_with_interaction,
+      total_pageviews AS pageviews_with_interaction
+    FROM (
+      SELECT
+        user_id,
+        count() AS total_pageviews,
+        countIf(type = 'custom_event') AS total_events,
+        uniqExact(session_id) AS total_sessions,
+        any(device_type) AS device_type,
+        any(browser) AS browser,
+        any(operating_system) AS operating_system,
+        any(toString(screen_width)) AS screen_width_str,
+        any(toString(screen_height)) AS screen_height_str,
+        any(country) AS country,
+        any(region) AS region,
+        any(city) AS city,
+        any(referrer) AS first_referrer,
+        any(channel) AS session_source,
+        any(pathname) AS entry_page,
+        any(pathname) AS exit_page,
+        any(pathname) AS top_page,
+        formatDateTime(min(timestamp), '%Y-%m-%d %H:%M:%S') AS first_seen,
+        formatDateTime(max(timestamp), '%Y-%m-%d %H:%M:%S') AS last_seen,
+        toInt32(dateDiff('second', min(timestamp), max(timestamp))) AS total_duration_seconds
+      FROM events
+      WHERE
+        site_id = {siteId:Int32}
+        ${filterStatement}
+        ${timeStatement}
+      GROUP BY user_id
+    )
+    ORDER BY last_seen DESC
   `;
 
   try {
