@@ -131,18 +131,18 @@ export async function exportAnalyticsCSV(
         COUNT(*) AS events_in_session,
         countIf(type = 'pageview') AS pageviews_in_session,
         countIf(type = 'custom_event') AS custom_events_in_session,
-        argMin(pathname, timestamp) AS entry_page,
-        argMax(pathname, timestamp) AS exit_page,
-        argMin(device_type, timestamp) AS device_type,
-        argMin(browser, timestamp) AS browser,
-        argMin(operating_system, timestamp) AS operating_system,
-        argMin(screen_width, timestamp) AS screen_width,
-        argMin(screen_height, timestamp) AS screen_height,
-        argMin(country, timestamp) AS country,
-        argMin(region, timestamp) AS region,
-        argMin(city, timestamp) AS city,
-        argMin(referrer, timestamp) AS referrer,
-        argMin(channel, timestamp) AS channel,
+        any(pathname) AS entry_page,
+        any(pathname) AS exit_page,
+        any(device_type) AS device_type,
+        any(browser) AS browser,
+        any(operating_system) AS operating_system,
+        any(screen_width) AS screen_width,
+        any(screen_height) AS screen_height,
+        any(country) AS country,
+        any(region) AS region,
+        any(city) AS city,
+        any(referrer) AS referrer,
+        any(channel) AS channel,
         -- Session has interaction if it has custom events or more than 1 pageview
         IF(custom_events_in_session > 0 OR pageviews_in_session > 1, 1, 0) AS has_interaction
       FROM events
@@ -167,17 +167,17 @@ export async function exportAnalyticsCSV(
         -- Is active user (more than 2 sessions)
         IF(COUNT(DISTINCT session_id) > 2, 1, 0) AS is_active_user,
         
-        -- Device info (first and most recent)
-        argMin(device_type, session_start) AS first_device_type,
-        argMax(device_type, session_end) AS device_type,
-        argMax(browser, session_end) AS browser,
-        argMax(operating_system, session_end) AS operating_system,
-        concat(toString(argMax(screen_width, session_end)), 'x', toString(argMax(screen_height, session_end))) AS screen_dimensions,
+        -- Device info (first device from first session)
+        any(device_type) AS first_device_type,
+        any(device_type) AS device_type,
+        any(browser) AS browser,
+        any(operating_system) AS operating_system,
+        any(concat(toString(screen_width), 'x', toString(screen_height))) AS screen_dimensions,
         
-        -- Location (most recent)
-        argMax(country, session_end) AS country,
-        argMax(region, session_end) AS region,
-        argMax(city, session_end) AS city,
+        -- Location (any recent location)
+        any(country) AS country,
+        any(region) AS region,
+        any(city) AS city,
         
         -- Bounce rate (sessions with only 1 pageview and no events)
         SUM(IF(pageviews_in_session = 1 AND has_interaction = 0, 1, 0)) / COUNT(DISTINCT session_id) * 100 AS bounce_rate,
@@ -189,12 +189,12 @@ export async function exportAnalyticsCSV(
         AVG(dateDiff('second', session_start, session_end)) AS avg_session_duration_seconds,
         
         -- Traffic source
-        argMin(referrer, session_start) AS first_referrer,
-        argMax(channel, session_end) AS session_source,
+        any(referrer) AS first_referrer,
+        any(channel) AS session_source,
         
         -- Entry/exit pages
-        argMin(entry_page, session_start) AS entry_page,
-        argMax(exit_page, session_end) AS exit_page,
+        any(entry_page) AS entry_page,
+        any(exit_page) AS exit_page,
         
         -- Timestamps
         MIN(session_start) AS first_seen,
