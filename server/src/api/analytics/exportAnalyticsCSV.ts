@@ -121,32 +121,6 @@ export async function exportAnalyticsCSV(
   // Main analytics query - comprehensive user-level analytics
   const query = `
     WITH 
-    -- Get all user events
-    UserEvents AS (
-      SELECT
-        user_id,
-        session_id,
-        timestamp,
-        pathname,
-        type,
-        device_type,
-        browser,
-        operating_system,
-        screen_width,
-        screen_height,
-        country,
-        region,
-        city,
-        referrer,
-        channel,
-        event_name
-      FROM events
-      WHERE
-        site_id = {siteId:Int32}
-        ${filterStatement}
-        ${timeStatement}
-    ),
-    
     -- Session-level aggregations
     SessionStats AS (
       SELECT
@@ -171,7 +145,11 @@ export async function exportAnalyticsCSV(
         argMin(channel, timestamp) AS channel,
         -- Session has interaction if it has custom events or more than 1 pageview
         IF(custom_events_in_session > 0 OR pageviews_in_session > 1, 1, 0) AS has_interaction
-      FROM UserEvents
+      FROM events
+      WHERE
+        site_id = {siteId:Int32}
+        ${filterStatement}
+        ${timeStatement}
       GROUP BY user_id, session_id
     ),
     
@@ -189,12 +167,12 @@ export async function exportAnalyticsCSV(
         -- Is active user (more than 2 sessions)
         IF(COUNT(DISTINCT session_id) > 2, 1, 0) AS is_active_user,
         
-        -- Device info (most recent)
-        argMax(device_type, session_end) AS device_type,
+        -- Device info (first and most recent)
         argMin(device_type, session_start) AS first_device_type,
+        argMax(device_type, session_end) AS device_type,
         argMax(browser, session_end) AS browser,
         argMax(operating_system, session_end) AS operating_system,
-        argMax(concat(toString(screen_width), 'x', toString(screen_height)), session_end) AS screen_dimensions,
+        concat(toString(argMax(screen_width, session_end)), 'x', toString(argMax(screen_height, session_end))) AS screen_dimensions,
         
         -- Location (most recent)
         argMax(country, session_end) AS country,
@@ -214,8 +192,8 @@ export async function exportAnalyticsCSV(
         argMin(referrer, session_start) AS first_referrer,
         argMax(channel, session_end) AS session_source,
         
-        -- Entry/exit pages (most common)
-        argMax(entry_page, session_end) AS entry_page,
+        -- Entry/exit pages
+        argMin(entry_page, session_start) AS entry_page,
         argMax(exit_page, session_end) AS exit_page,
         
         -- Timestamps
@@ -231,8 +209,12 @@ export async function exportAnalyticsCSV(
         user_id,
         pathname AS top_page,
         ROW_NUMBER() OVER (PARTITION BY user_id ORDER BY COUNT(*) DESC) AS rn
-      FROM UserEvents
-      WHERE type = 'pageview'
+      FROM events
+      WHERE
+        site_id = {siteId:Int32}
+        AND type = 'pageview'
+        ${filterStatement}
+        ${timeStatement}
       GROUP BY user_id, pathname
     )
     
