@@ -4,6 +4,30 @@
 
 Este documento describe cómo integrar los datos de contacto (email, teléfono, nombre) en la vista de detalle del usuario en Rybbit. Esta funcionalidad permite que administradores y agentes de soporte visualicen información de contacto del usuario para identificarlo, dar seguimiento y brindar atención comercial.
 
+## Configuración
+
+### Variable de Entorno Requerida
+
+Para que Rybbit pueda consultar los datos de usuario directamente desde la BD de EasyOrder, necesitas configurar:
+
+```env
+EASYORDER_DATABASE_URL=postgresql://usuario:password@host:5432/easyorder_db
+```
+
+Esta variable permite a Rybbit consultar la tabla `usuarios` de EasyOrder para obtener:
+- `correo_electronico` (email)
+- `nombre` (name)
+- `telefono` (phone) - cuando esté disponible
+
+### Fuentes de Datos
+
+Los endpoints consultan datos en el siguiente orden de prioridad:
+
+1. **Tabla local `tracked_user_profiles`** - Datos enviados via `/api/identify`
+2. **BD de EasyOrder** - Consulta directa a la tabla `usuarios`
+
+Si no se configura `EASYORDER_DATABASE_URL`, solo se usará la fuente local.
+
 ## Endpoints Disponibles
 
 ### 1. Obtener datos de contacto de un usuario específico

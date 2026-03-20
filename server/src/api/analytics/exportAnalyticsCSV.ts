@@ -6,6 +6,7 @@ import { eq } from "drizzle-orm";
 import { getUserHasAccessToSitePublic } from "../../lib/auth-utils.js";
 import { getFilterStatement, getTimeStatement, processResults } from "./utils.js";
 import { FilterParams } from "@rybbit/shared";
+import { getEasyOrderUserById, getEasyOrderUsersByIds } from "../../db/easyorder/easyorder.js";
 
 export interface ExportAnalyticsCSVRequest {
   Params: {
@@ -172,10 +173,11 @@ export async function exportAnalyticsCSV(
 
     const analyticsData = await processResults<AnalyticsRow>(result);
 
-    // Optionally fetch user profiles (email, phone) from PostgreSQL
+    // Fetch user profiles (email, phone) from multiple sources
     let userProfiles: Map<string, { email: string | null; phone: string | null; name: string | null }> = new Map();
     
     if (includeUserProfiles === "true" && analyticsData.length > 0) {
+      // 1. First get from local tracked_user_profiles
       const profiles = await db
         .select()
         .from(trackedUserProfiles)
@@ -187,6 +189,25 @@ export async function exportAnalyticsCSV(
           phone: profile.phone,
           name: profile.name,
         });
+      }
+
+      // 2. For users without local profiles, try to fetch from EasyOrder
+      const userIdsWithoutProfiles = analyticsData
+        .map((row) => row.user_id)
+        .filter((userId) => !userProfiles.has(userId));
+
+      if (userIdsWithoutProfiles.length > 0) {
+        const easyOrderUsers = await getEasyOrderUsersByIds(userIdsWithoutProfiles);
+        
+        for (const [userId, user] of easyOrderUsers) {
+          if (!userProfiles.has(userId)) {
+            userProfiles.set(userId, {
+              email: user.correo_electronico,
+              phone: user.telefono || null,
+              name: user.nombre,
+            });
+          }
+        }
       }
     }
 
@@ -421,6 +442,10 @@ export async function getUserProfiles(
 /**
  * Get contact data for a specific user (email, phone, name)
  * Used in user detail view to display contact information
+ * 
+ * Data sources (in order of priority):
+ * 1. Local tracked_user_profiles table (from /api/identify calls)
+ * 2. EasyOrder database (direct query to usuarios table)
  */
 export async function getUserContactData(
   req: FastifyRequest<GetUserContactDataRequest>,
@@ -437,7 +462,7 @@ export async function getUserContactData(
 
     const siteId = Number(site);
 
-    // Get user profile data
+    // 1. First try to get from local tracked_user_profiles
     const profile = await db
       .select({
         user_id: trackedUserProfiles.userId,
@@ -453,25 +478,45 @@ export async function getUserContactData(
           eq(trackedUserProfiles.userId, userId)
       );
 
-    if (profile.length === 0) {
-      // User not found in tracked profiles, return empty contact data
+    if (profile.length > 0) {
+      return res.send({
+        success: true,
+        data: profile[0],
+        source: "rybbit",
+      });
+    }
+
+    // 2. If not found locally, try to fetch from EasyOrder database
+    const easyOrderUser = await getEasyOrderUserById(userId);
+
+    if (easyOrderUser) {
       return res.send({
         success: true,
         data: {
           user_id: userId,
-          email: null,
-          phone: null,
-          name: null,
+          email: easyOrderUser.correo_electronico,
+          phone: easyOrderUser.telefono || null,
+          name: easyOrderUser.nombre,
           created_at: null,
           updated_at: null,
         },
-        message: "No contact data available for this user",
+        source: "easyorder",
       });
     }
 
+    // 3. No data found in either source
     return res.send({
       success: true,
-      data: profile[0],
+      data: {
+        user_id: userId,
+        email: null,
+        phone: null,
+        name: null,
+        created_at: null,
+        updated_at: null,
+      },
+      message: "No contact data available for this user",
+      source: null,
     });
   } catch (error) {
     console.error("Error fetching user contact data:", error);
