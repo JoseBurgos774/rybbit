@@ -252,3 +252,28 @@ export const goals = pgTable(
     }),
   ]
 );
+
+// User profiles table for storing tracked user contact information (email, phone)
+// This stores the custom user_id from the tracking script along with contact info
+export const trackedUserProfiles = pgTable(
+  "tracked_user_profiles",
+  {
+    id: serial("id").primaryKey().notNull(),
+    siteId: integer("site_id").notNull(),
+    userId: text("user_id").notNull(), // The custom user_id sent via identify()
+    email: text("email"),
+    phone: text("phone"),
+    name: text("name"),
+    traits: jsonb("traits").$type<Record<string, unknown>>(), // Additional traits
+    createdAt: timestamp("created_at", { mode: "string" }).defaultNow(),
+    updatedAt: timestamp("updated_at", { mode: "string" }).defaultNow(),
+  },
+  (table) => [
+    foreignKey({
+      columns: [table.siteId],
+      foreignColumns: [sites.siteId],
+      name: "tracked_user_profiles_site_id_sites_site_id_fk",
+    }),
+    unique("tracked_user_profiles_site_user_unique").on(table.siteId, table.userId),
+  ]
+);

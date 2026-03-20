@@ -35,6 +35,8 @@ import { getWeeklyActiveAccounts } from "./api/analytics/getWeeklyActiveAccounts
 import { getOnboardingFunnel } from "./api/analytics/getOnboardingFunnel.js";
 import { getAbandonmentData } from "./api/analytics/getAbandonmentData.js";
 import { getUserOnboardingEvents } from "./api/analytics/getUserOnboardingEvents.js";
+import { identifyUser } from "./api/analytics/identifyUser.js";
+import { exportAnalyticsCSV, getAnalyticsSummary } from "./api/analytics/exportAnalyticsCSV.js";
 import { createGoal } from "./api/analytics/goals/createGoal.js";
 import { deleteGoal } from "./api/analytics/goals/deleteGoal.js";
 import { getGoals } from "./api/analytics/goals/getGoals.js";
@@ -148,6 +150,7 @@ const PUBLIC_ROUTES: string[] = [
   "/api/auth/callback/github",
   "/api/stripe/webhook",
   "/api/session-replay/record",
+  "/api/identify",
 ];
 
 // Define analytics routes that can be public
@@ -189,6 +192,8 @@ const ANALYTICS_ROUTES = [
   "/api/analytics/onboarding-funnel/",
   "/api/analytics/abandonment-data/",
   "/api/analytics/user-onboarding-events/",
+  "/api/analytics/export-csv/",
+  "/api/analytics/summary/",
 ];
 
 server.addHook("onRequest", async (request, reply) => {
@@ -291,6 +296,11 @@ server.get("/api/analytics/weekly-active/:site", getWeeklyActiveAccounts);
 server.get("/api/analytics/onboarding-funnel/:site", getOnboardingFunnel);
 server.get("/api/analytics/abandonment-data/:site", getAbandonmentData);
 server.get("/api/analytics/user-onboarding-events/:site/:user_id", getUserOnboardingEvents);
+
+// User Profile & Export Analytics
+server.post("/api/identify", identifyUser);
+server.get("/api/analytics/export-csv/:site", exportAnalyticsCSV);
+server.get("/api/analytics/summary/:site", getAnalyticsSummary);
 
 // Performance Analytics
 server.get("/api/performance/overview/:site", getPerformanceOverview);
