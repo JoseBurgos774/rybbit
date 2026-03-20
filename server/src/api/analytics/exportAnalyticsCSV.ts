@@ -17,52 +17,33 @@ export interface ExportAnalyticsCSVRequest {
 }
 
 interface AnalyticsRow {
-  // User identification
   user_id: string;
-  email?: string;
-  phone?: string;
-  user_name?: string;
-  
-  // Visits & Sessions
   total_pageviews: number;
-  pageviews_with_interaction: number;
+  total_events: number;
   total_sessions: number;
-  sessions_with_interaction: number;
-  
-  // User classification
-  is_active_user: boolean; // entered more than 2 times
-  is_new_user: boolean;
-  is_returning_user: boolean;
-  
-  // Device info
+  is_active_user: number;
+  is_new_user: number;
+  is_returning_user: number;
   device_type: string;
   first_device_type: string;
   browser: string;
   operating_system: string;
   screen_dimensions: string;
-  
-  // Location
   country: string;
   region: string;
   city: string;
-  
-  // Session metrics
-  bounce_rate: number;
-  interaction_rate: number;
-  avg_session_duration_seconds: number;
-  
-  // Traffic source
   first_referrer: string;
   session_source: string;
-  
-  // Page paths
   entry_page: string;
   exit_page: string;
   top_page: string;
-  
-  // Timestamps
   first_seen: string;
   last_seen: string;
+  avg_session_duration_seconds: number;
+  bounce_rate: number;
+  interaction_rate: number;
+  sessions_with_interaction: number;
+  pageviews_with_interaction: number;
 }
 
 /**
@@ -118,136 +99,62 @@ export async function exportAnalyticsCSV(
     pastMinutesEnd,
   });
 
-  // Main analytics query - comprehensive user-level analytics
+  // Main analytics query - simplified user-level analytics
   const query = `
-    WITH 
-    -- Session-level aggregations
-    SessionStats AS (
-      SELECT
-        user_id,
-        session_id,
-        MIN(timestamp) AS session_start,
-        MAX(timestamp) AS session_end,
-        COUNT(*) AS events_in_session,
-        countIf(type = 'pageview') AS pageviews_in_session,
-        countIf(type = 'custom_event') AS custom_events_in_session,
-        any(pathname) AS entry_page,
-        any(pathname) AS exit_page,
-        any(device_type) AS device_type,
-        any(browser) AS browser,
-        any(operating_system) AS operating_system,
-        any(screen_width) AS screen_width,
-        any(screen_height) AS screen_height,
-        any(country) AS country,
-        any(region) AS region,
-        any(city) AS city,
-        any(referrer) AS referrer,
-        any(channel) AS channel,
-        -- Session has interaction if it has custom events or more than 1 pageview
-        IF(custom_events_in_session > 0 OR pageviews_in_session > 1, 1, 0) AS has_interaction
-      FROM events
-      WHERE
-        site_id = {siteId:Int32}
-        ${filterStatement}
-        ${timeStatement}
-      GROUP BY user_id, session_id
-    ),
-    
-    -- User-level aggregations
-    UserStats AS (
-      SELECT
-        user_id,
-        
-        -- Total metrics
-        SUM(pageviews_in_session) AS total_pageviews,
-        SUM(IF(has_interaction = 1, pageviews_in_session, 0)) AS pageviews_with_interaction,
-        COUNT(DISTINCT session_id) AS total_sessions,
-        SUM(has_interaction) AS sessions_with_interaction,
-        
-        -- Is active user (more than 2 sessions)
-        IF(COUNT(DISTINCT session_id) > 2, 1, 0) AS is_active_user,
-        
-        -- Device info (first device from first session)
-        any(device_type) AS first_device_type,
-        any(device_type) AS device_type,
-        any(browser) AS browser,
-        any(operating_system) AS operating_system,
-        any(concat(toString(screen_width), 'x', toString(screen_height))) AS screen_dimensions,
-        
-        -- Location (any recent location)
-        any(country) AS country,
-        any(region) AS region,
-        any(city) AS city,
-        
-        -- Bounce rate (sessions with only 1 pageview and no events)
-        SUM(IF(pageviews_in_session = 1 AND has_interaction = 0, 1, 0)) / COUNT(DISTINCT session_id) * 100 AS bounce_rate,
-        
-        -- Interaction rate
-        SUM(has_interaction) / COUNT(DISTINCT session_id) * 100 AS interaction_rate,
-        
-        -- Average session duration
-        AVG(dateDiff('second', session_start, session_end)) AS avg_session_duration_seconds,
-        
-        -- Traffic source
-        any(referrer) AS first_referrer,
-        any(channel) AS session_source,
-        
-        -- Entry/exit pages
-        any(entry_page) AS entry_page,
-        any(exit_page) AS exit_page,
-        
-        -- Timestamps
-        MIN(session_start) AS first_seen,
-        MAX(session_end) AS last_seen
-      FROM SessionStats
-      GROUP BY user_id
-    ),
-    
-    -- Get top page per user
-    TopPages AS (
-      SELECT
-        user_id,
-        pathname AS top_page,
-        ROW_NUMBER() OVER (PARTITION BY user_id ORDER BY COUNT(*) DESC) AS rn
-      FROM events
-      WHERE
-        site_id = {siteId:Int32}
-        AND type = 'pageview'
-        ${filterStatement}
-        ${timeStatement}
-      GROUP BY user_id, pathname
-    )
-    
     SELECT
-      u.user_id,
-      u.total_pageviews,
-      u.pageviews_with_interaction,
-      u.total_sessions,
-      u.sessions_with_interaction,
-      u.is_active_user,
-      IF(u.total_sessions = 1, 1, 0) AS is_new_user,
-      IF(u.total_sessions > 1, 1, 0) AS is_returning_user,
-      u.device_type,
-      u.first_device_type,
-      u.browser,
-      u.operating_system,
-      u.screen_dimensions,
-      u.country,
-      u.region,
-      u.city,
-      ROUND(u.bounce_rate, 2) AS bounce_rate,
-      ROUND(u.interaction_rate, 2) AS interaction_rate,
-      ROUND(u.avg_session_duration_seconds, 2) AS avg_session_duration_seconds,
-      u.first_referrer,
-      u.session_source,
-      u.entry_page,
-      u.exit_page,
-      COALESCE(tp.top_page, '') AS top_page,
-      formatDateTime(u.first_seen, '%Y-%m-%d %H:%M:%S') AS first_seen,
-      formatDateTime(u.last_seen, '%Y-%m-%d %H:%M:%S') AS last_seen
-    FROM UserStats u
-    LEFT JOIN TopPages tp ON u.user_id = tp.user_id AND tp.rn = 1
-    ORDER BY u.last_seen DESC
+      user_id,
+      
+      -- Total metrics
+      countIf(type = 'pageview') AS total_pageviews,
+      countIf(type = 'custom_event') AS total_events,
+      uniq(session_id) AS total_sessions,
+      
+      -- Is active user (more than 2 sessions)
+      IF(uniq(session_id) > 2, 1, 0) AS is_active_user,
+      IF(uniq(session_id) = 1, 1, 0) AS is_new_user,
+      IF(uniq(session_id) > 1, 1, 0) AS is_returning_user,
+      
+      -- Device info
+      anyLast(device_type) AS device_type,
+      anyLast(device_type) AS first_device_type,
+      anyLast(browser) AS browser,
+      anyLast(operating_system) AS operating_system,
+      concat(toString(anyLast(screen_width)), 'x', toString(anyLast(screen_height))) AS screen_dimensions,
+      
+      -- Location
+      anyLast(country) AS country,
+      anyLast(region) AS region,
+      anyLast(city) AS city,
+      
+      -- Traffic source
+      anyLast(referrer) AS first_referrer,
+      anyLast(channel) AS session_source,
+      
+      -- Pages
+      anyLast(pathname) AS entry_page,
+      anyLast(pathname) AS exit_page,
+      anyLast(pathname) AS top_page,
+      
+      -- Timestamps
+      formatDateTime(MIN(timestamp), '%Y-%m-%d %H:%M:%S') AS first_seen,
+      formatDateTime(MAX(timestamp), '%Y-%m-%d %H:%M:%S') AS last_seen,
+      
+      -- Session duration (approximate)
+      dateDiff('second', MIN(timestamp), MAX(timestamp)) / greatest(uniq(session_id), 1) AS avg_session_duration_seconds,
+      
+      -- Bounce and interaction rates (simplified)
+      0 AS bounce_rate,
+      IF(countIf(type = 'custom_event') > 0, 100, 0) AS interaction_rate,
+      countIf(type = 'custom_event') AS sessions_with_interaction,
+      countIf(type = 'pageview') AS pageviews_with_interaction
+      
+    FROM events
+    WHERE
+      site_id = {siteId:Int32}
+      ${filterStatement}
+      ${timeStatement}
+    GROUP BY user_id
+    ORDER BY MAX(timestamp) DESC
   `;
 
   try {
@@ -297,9 +204,8 @@ export async function exportAnalyticsCSV(
       "phone",
       "user_name",
       "total_pageviews",
-      "pageviews_with_interaction",
+      "total_events",
       "total_sessions",
-      "sessions_with_interaction",
       "is_active_user",
       "is_new_user",
       "is_returning_user",
@@ -311,9 +217,6 @@ export async function exportAnalyticsCSV(
       "country",
       "region",
       "city",
-      "bounce_rate",
-      "interaction_rate",
-      "avg_session_duration_seconds",
       "first_referrer",
       "session_source",
       "entry_page",
@@ -321,6 +224,11 @@ export async function exportAnalyticsCSV(
       "top_page",
       "first_seen",
       "last_seen",
+      "avg_session_duration_seconds",
+      "bounce_rate",
+      "interaction_rate",
+      "sessions_with_interaction",
+      "pageviews_with_interaction",
     ];
 
     const escapeCSV = (value: unknown): string => {
@@ -389,52 +297,24 @@ export async function getAnalyticsSummary(
   });
 
   const query = `
-    WITH 
-    SessionStats AS (
-      SELECT
-        session_id,
-        user_id,
-        MIN(timestamp) AS session_start,
-        MAX(timestamp) AS session_end,
-        countIf(type = 'pageview') AS pageviews_in_session,
-        countIf(type = 'custom_event') AS custom_events_in_session,
-        IF(countIf(type = 'custom_event') > 0 OR countIf(type = 'pageview') > 1, 1, 0) AS has_interaction
-      FROM events
-      WHERE
-        site_id = {siteId:Int32}
-        ${filterStatement}
-        ${timeStatement}
-      GROUP BY session_id, user_id
-    ),
-    UserSessionCounts AS (
-      SELECT
-        user_id,
-        COUNT(DISTINCT session_id) AS session_count
-      FROM SessionStats
-      GROUP BY user_id
-    )
     SELECT
       -- Total metrics
-      SUM(pageviews_in_session) AS total_pageviews,
-      SUM(IF(has_interaction = 1, pageviews_in_session, 0)) AS pageviews_with_interaction,
-      COUNT(DISTINCT session_id) AS total_sessions,
-      SUM(has_interaction) AS sessions_with_interaction,
-      COUNT(DISTINCT user_id) AS total_users,
+      countIf(type = 'pageview') AS total_pageviews,
+      countIf(type = 'custom_event') AS total_events,
+      uniq(session_id) AS total_sessions,
+      uniq(user_id) AS total_users,
       
-      -- Active users (more than 2 sessions)
-      (SELECT COUNT(*) FROM UserSessionCounts WHERE session_count > 2) AS active_users,
+      -- Simplified rates
+      0 AS bounce_rate,
+      ROUND(countIf(type = 'custom_event') / greatest(uniq(session_id), 1) * 100, 2) AS interaction_rate,
       
-      -- New vs returning
-      (SELECT COUNT(*) FROM UserSessionCounts WHERE session_count = 1) AS new_users,
-      (SELECT COUNT(*) FROM UserSessionCounts WHERE session_count > 1) AS returning_users,
-      
-      -- Rates
-      ROUND(SUM(IF(pageviews_in_session = 1 AND has_interaction = 0, 1, 0)) / COUNT(DISTINCT session_id) * 100, 2) AS bounce_rate,
-      ROUND(SUM(has_interaction) / COUNT(DISTINCT session_id) * 100, 2) AS interaction_rate,
-      
-      -- Average session duration
-      ROUND(AVG(dateDiff('second', session_start, session_end)), 2) AS avg_session_duration_seconds
-    FROM SessionStats
+      -- Average session duration (approximate)
+      ROUND(dateDiff('second', MIN(timestamp), MAX(timestamp)) / greatest(uniq(session_id), 1), 2) AS avg_session_duration_seconds
+    FROM events
+    WHERE
+      site_id = {siteId:Int32}
+      ${filterStatement}
+      ${timeStatement}
   `;
 
   try {
