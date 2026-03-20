@@ -36,7 +36,7 @@ import { getOnboardingFunnel } from "./api/analytics/getOnboardingFunnel.js";
 import { getAbandonmentData } from "./api/analytics/getAbandonmentData.js";
 import { getUserOnboardingEvents } from "./api/analytics/getUserOnboardingEvents.js";
 import { identifyUser } from "./api/analytics/identifyUser.js";
-import { exportAnalyticsCSV, getAnalyticsSummary } from "./api/analytics/exportAnalyticsCSV.js";
+import { exportAnalyticsCSV, getAnalyticsSummary, getUserProfiles, getUserContactData } from "./api/analytics/exportAnalyticsCSV.js";
 import { createGoal } from "./api/analytics/goals/createGoal.js";
 import { deleteGoal } from "./api/analytics/goals/deleteGoal.js";
 import { getGoals } from "./api/analytics/goals/getGoals.js";
@@ -301,6 +301,8 @@ server.get("/api/analytics/user-onboarding-events/:site/:user_id", getUserOnboar
 server.post("/api/identify", identifyUser);
 server.get("/api/analytics/export-csv/:site", exportAnalyticsCSV);
 server.get("/api/analytics/summary/:site", getAnalyticsSummary);
+server.get("/api/analytics/user-profiles/:site", getUserProfiles);
+server.get("/api/analytics/user/:userId/:site", getUserContactData);
 
 // Performance Analytics
 server.get("/api/performance/overview/:site", getPerformanceOverview);

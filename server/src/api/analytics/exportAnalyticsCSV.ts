@@ -341,3 +341,140 @@ export async function getAnalyticsSummary(
     return res.status(500).send({ error: "Failed to fetch analytics summary" });
   }
 }
+
+export interface GetUserProfilesRequest {
+  Params: {
+    site: string;
+  };
+  Querystring: {
+    limit?: string;
+    offset?: string;
+  };
+}
+
+export interface GetUserContactDataRequest {
+  Params: {
+    userId: string;
+    site: string;
+  };
+}
+
+/**
+ * Get all identified user profiles (email, phone) for a site
+ */
+export async function getUserProfiles(
+  req: FastifyRequest<GetUserProfilesRequest>,
+  res: FastifyReply
+) {
+  try {
+    const { site } = req.params;
+    const limit = Math.min(parseInt(req.query.limit || "100"), 1000);
+    const offset = parseInt(req.query.offset || "0");
+
+    // Check access
+    const hasAccess = await getUserHasAccessToSitePublic(req, site);
+    if (!hasAccess) {
+      return res.status(403).send({ error: "Unauthorized" });
+    }
+
+    const siteId = Number(site);
+
+    // Get all user profiles for this site
+    const profiles = await db
+      .select({
+        user_id: trackedUserProfiles.userId,
+        email: trackedUserProfiles.email,
+        phone: trackedUserProfiles.phone,
+        name: trackedUserProfiles.name,
+        created_at: trackedUserProfiles.createdAt,
+        updated_at: trackedUserProfiles.updatedAt,
+      })
+      .from(trackedUserProfiles)
+      .where(eq(trackedUserProfiles.siteId, siteId))
+      .orderBy(trackedUserProfiles.createdAt)
+      .limit(limit)
+      .offset(offset);
+
+    // Get total count
+    const countResult = await db
+      .select({ count: trackedUserProfiles.userId })
+      .from(trackedUserProfiles)
+      .where(eq(trackedUserProfiles.siteId, siteId));
+
+    const total = countResult.length;
+
+    return res.send({
+      success: true,
+      data: profiles,
+      pagination: {
+        limit,
+        offset,
+        total,
+      },
+    });
+  } catch (error) {
+    console.error("Error fetching user profiles:", error);
+    return res.status(500).send({ error: "Failed to fetch user profiles" });
+  }
+}
+
+/**
+ * Get contact data for a specific user (email, phone, name)
+ * Used in user detail view to display contact information
+ */
+export async function getUserContactData(
+  req: FastifyRequest<GetUserContactDataRequest>,
+  res: FastifyReply
+) {
+  try {
+    const { userId, site } = req.params;
+
+    // Check access
+    const hasAccess = await getUserHasAccessToSitePublic(req, site);
+    if (!hasAccess) {
+      return res.status(403).send({ error: "Unauthorized" });
+    }
+
+    const siteId = Number(site);
+
+    // Get user profile data
+    const profile = await db
+      .select({
+        user_id: trackedUserProfiles.userId,
+        email: trackedUserProfiles.email,
+        phone: trackedUserProfiles.phone,
+        name: trackedUserProfiles.name,
+        created_at: trackedUserProfiles.createdAt,
+        updated_at: trackedUserProfiles.updatedAt,
+      })
+      .from(trackedUserProfiles)
+      .where(
+        eq(trackedUserProfiles.siteId, siteId) &&
+          eq(trackedUserProfiles.userId, userId)
+      );
+
+    if (profile.length === 0) {
+      // User not found in tracked profiles, return empty contact data
+      return res.send({
+        success: true,
+        data: {
+          user_id: userId,
+          email: null,
+          phone: null,
+          name: null,
+          created_at: null,
+          updated_at: null,
+        },
+        message: "No contact data available for this user",
+      });
+    }
+
+    return res.send({
+      success: true,
+      data: profile[0],
+    });
+  } catch (error) {
+    console.error("Error fetching user contact data:", error);
+    return res.status(500).send({ error: "Failed to fetch user contact data" });
+  }
+}
