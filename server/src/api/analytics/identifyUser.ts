@@ -1,5 +1,5 @@
 import { FastifyReply, FastifyRequest } from "fastify";
-import { db } from "../../db/postgres/drizzle.js";
+import { db } from "../../db/postgres/postgres.js";
 import { trackedUserProfiles, sites } from "../../db/postgres/schema.js";
 import { eq, and } from "drizzle-orm";
 import { z } from "zod";
