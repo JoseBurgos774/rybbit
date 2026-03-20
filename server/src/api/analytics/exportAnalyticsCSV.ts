@@ -148,8 +148,8 @@ export async function exportAnalyticsCSV(
         any(pathname) AS entry_page,
         any(pathname) AS exit_page,
         any(pathname) AS top_page,
-        formatDateTime(min(timestamp), '%Y-%m-%d %H:%M:%S') AS first_seen,
-        formatDateTime(max(timestamp), '%Y-%m-%d %H:%M:%S') AS last_seen,
+        formatDateTime(min(timestamp), '%Y-%m-%d %H:%i:%s') AS first_seen,
+        formatDateTime(max(timestamp), '%Y-%m-%d %H:%i:%s') AS last_seen,
         toInt32(dateDiff('second', min(timestamp), max(timestamp))) AS total_duration_seconds
       FROM events
       WHERE
