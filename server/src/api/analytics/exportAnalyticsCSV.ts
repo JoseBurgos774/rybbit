@@ -2,7 +2,7 @@ import { FastifyReply, FastifyRequest } from "fastify";
 import { clickhouse } from "../../db/clickhouse/clickhouse.js";
 import { db } from "../../db/postgres/postgres.js";
 import { trackedUserProfiles } from "../../db/postgres/schema.js";
-import { eq } from "drizzle-orm";
+import { eq, or, isNotNull, like, and, sql } from "drizzle-orm";
 import { getUserHasAccessToSitePublic } from "../../lib/auth-utils.js";
 import { getFilterStatement, getTimeStatement, processResults } from "./utils.js";
 import { FilterParams } from "@rybbit/shared";
@@ -370,6 +370,12 @@ export interface GetUserProfilesRequest {
   Querystring: {
     limit?: string;
     offset?: string;
+    hasEmail?: string;      // "true" to filter users with email
+    hasPhone?: string;      // "true" to filter users with phone
+    hasContact?: string;    // "true" to filter users with email OR phone
+    email?: string;         // partial email search
+    phone?: string;         // partial phone search
+    search?: string;        // search in email, phone, or name
   };
 }
 
@@ -382,6 +388,13 @@ export interface GetUserContactDataRequest {
 
 /**
  * Get all identified user profiles (email, phone) for a site
+ * Supports filtering by:
+ * - hasEmail: "true" to get only users with email
+ * - hasPhone: "true" to get only users with phone
+ * - hasContact: "true" to get users with email OR phone
+ * - email: partial email search (e.g., "gmail" matches "user@gmail.com")
+ * - phone: partial phone search (e.g., "55" matches "+52 55 1234")
+ * - search: search in email, phone, or name
  */
 export async function getUserProfiles(
   req: FastifyRequest<GetUserProfilesRequest>,
@@ -391,6 +404,7 @@ export async function getUserProfiles(
     const { site } = req.params;
     const limit = Math.min(parseInt(req.query.limit || "100"), 1000);
     const offset = parseInt(req.query.offset || "0");
+    const { hasEmail, hasPhone, hasContact, email, phone, search } = req.query;
 
     // Check access
     const hasAccess = await getUserHasAccessToSitePublic(req, site);
@@ -400,7 +414,51 @@ export async function getUserProfiles(
 
     const siteId = Number(site);
 
-    // Get all user profiles for this site
+    // Build filter conditions
+    const conditions: ReturnType<typeof eq>[] = [eq(trackedUserProfiles.siteId, siteId)];
+
+    // Filter: hasEmail - only users with email
+    if (hasEmail === "true") {
+      conditions.push(isNotNull(trackedUserProfiles.email));
+    }
+
+    // Filter: hasPhone - only users with phone
+    if (hasPhone === "true") {
+      conditions.push(isNotNull(trackedUserProfiles.phone));
+    }
+
+    // Filter: hasContact - users with email OR phone (at least one)
+    if (hasContact === "true") {
+      conditions.push(
+        or(
+          isNotNull(trackedUserProfiles.email),
+          isNotNull(trackedUserProfiles.phone)
+        )!
+      );
+    }
+
+    // Filter: partial email search
+    if (email) {
+      conditions.push(like(trackedUserProfiles.email, `%${email}%`));
+    }
+
+    // Filter: partial phone search
+    if (phone) {
+      conditions.push(like(trackedUserProfiles.phone, `%${phone}%`));
+    }
+
+    // Filter: search in email, phone, or name
+    if (search) {
+      conditions.push(
+        or(
+          like(trackedUserProfiles.email, `%${search}%`),
+          like(trackedUserProfiles.phone, `%${search}%`),
+          like(trackedUserProfiles.name, `%${search}%`)
+        )!
+      );
+    }
+
+    // Get filtered user profiles
     const profiles = await db
       .select({
         user_id: trackedUserProfiles.userId,
@@ -411,18 +469,18 @@ export async function getUserProfiles(
         updated_at: trackedUserProfiles.updatedAt,
       })
       .from(trackedUserProfiles)
-      .where(eq(trackedUserProfiles.siteId, siteId))
+      .where(and(...conditions))
       .orderBy(trackedUserProfiles.createdAt)
       .limit(limit)
       .offset(offset);
 
-    // Get total count
+    // Get total count with same filters
     const countResult = await db
-      .select({ count: trackedUserProfiles.userId })
+      .select({ count: sql<number>`count(*)` })
       .from(trackedUserProfiles)
-      .where(eq(trackedUserProfiles.siteId, siteId));
+      .where(and(...conditions));
 
-    const total = countResult.length;
+    const total = Number(countResult[0]?.count || 0);
 
     return res.send({
       success: true,
@@ -431,6 +489,14 @@ export async function getUserProfiles(
         limit,
         offset,
         total,
+      },
+      filters: {
+        hasEmail: hasEmail === "true",
+        hasPhone: hasPhone === "true",
+        hasContact: hasContact === "true",
+        email: email || null,
+        phone: phone || null,
+        search: search || null,
       },
     });
   } catch (error) {
