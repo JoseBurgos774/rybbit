@@ -33,9 +33,14 @@ export async function getAbandonmentData(
   const user_id = queryParams.user_id as string | undefined;
   const startDate = queryParams.startDate as string | undefined;
   const endDate = queryParams.endDate as string | undefined;
-  const uniqueUsers = queryParams.unique_users === "true"; // Nuevo parámetro
+  const uniqueUsers = queryParams.unique_users === "true";
   const limitParam = queryParams.limit ? parseInt(queryParams.limit as string) : 100;
   const offsetParam = queryParams.offset ? parseInt(queryParams.offset as string) : 0;
+  
+  // Nuevos filtros para evitar spam y manejar zona horaria
+  const minHoursAgo = queryParams.minHoursAgo ? parseFloat(queryParams.minHoursAgo as string) : undefined;
+  const maxHoursAgo = queryParams.maxHoursAgo ? parseFloat(queryParams.maxHoursAgo as string) : undefined;
+  const timeZone = queryParams.timeZone as string | undefined; // ej: "America/Mexico_City"
 
   const limit = Math.max(1, Math.min(1000, limitParam || 100));
   const offset = Math.max(0, offsetParam || 0);
@@ -67,6 +72,20 @@ export async function getAbandonmentData(
     if (endDate) {
       whereConditions.push(`toDate(timestamp) <= {endDate:Date}`);
       params.endDate = endDate;
+    }
+
+    // Filtro: solo eventos con más de X horas de antigüedad (para no spamear usuarios recientes)
+    // Ejemplo: minHoursAgo=5 → solo eventos de hace más de 5 horas
+    if (minHoursAgo !== undefined && minHoursAgo > 0) {
+      whereConditions.push(`timestamp <= now() - INTERVAL {minHoursAgo:Float64} HOUR`);
+      params.minHoursAgo = minHoursAgo;
+    }
+
+    // Filtro: solo eventos de las últimas X horas (para limitar ventana de tiempo)
+    // Ejemplo: maxHoursAgo=48 → solo eventos de las últimas 48 horas
+    if (maxHoursAgo !== undefined && maxHoursAgo > 0) {
+      whereConditions.push(`timestamp >= now() - INTERVAL {maxHoursAgo:Float64} HOUR`);
+      params.maxHoursAgo = maxHoursAgo;
     }
 
     const whereClause = whereConditions.join(" AND ");
@@ -198,6 +217,11 @@ export async function getAbandonmentData(
         site_id: site,
         filtered_by_user: user_id ? true : false,
         date_range: startDate || endDate ? { startDate, endDate } : null,
+        time_filters: {
+          minHoursAgo: minHoursAgo || null,
+          maxHoursAgo: maxHoursAgo || null,
+          timeZone: timeZone || null,
+        },
       },
     });
   } catch (error) {

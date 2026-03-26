@@ -29,6 +29,9 @@ GET /api/analytics/abandonment-data/:site
 - `unique_users` (optional): **`true` para obtener solo un registro por usuario** (el último abandono). Incluye campo `abandonment_count` con el número de veces que abandonó.
 - `limit` (optional): Número de registros a retornar (default: 100, max: 1000)
 - `offset` (optional): Offset para paginación (default: 0)
+- `minHoursAgo` (optional): **Solo eventos con más de X horas de antigüedad** (ej: `5` para eventos de hace más de 5 horas). Útil para no spamear usuarios recientes.
+- `maxHoursAgo` (optional): **Solo eventos de las últimas X horas** (ej: `48` para eventos de las últimas 48 horas). Útil para limitar ventana de tiempo.
+- `timeZone` (optional): Zona horaria para referencia (ej: `America/Mexico_City`). Se incluye en metadata de respuesta.
 
 ## Autenticación
 
@@ -100,6 +103,31 @@ curl -H "X-API-Key: rb_your_api_key" \
   "https://api-rybbit.nexgen.systems/api/analytics/abandonment-data/2?limit=50&offset=0"
 ```
 
+### 5. Obtener solo eventos con más de 5 horas de antigüedad (evitar spam)
+
+```bash
+# Solo usuarios que abandonaron hace más de 5 horas (para no contactar usuarios recientes)
+curl -H "X-API-Key: rb_your_api_key" \
+  "https://api-rybbit.nexgen.systems/api/analytics/abandonment-data/2?minHoursAgo=5&unique_users=true"
+```
+
+### 6. Obtener eventos de las últimas 48 horas, pero con más de 5 horas de antigüedad
+
+```bash
+# Ventana de tiempo: entre 5 y 48 horas atrás
+curl -H "X-API-Key: rb_your_api_key" \
+  "https://api-rybbit.nexgen.systems/api/analytics/abandonment-data/2?minHoursAgo=5&maxHoursAgo=48&unique_users=true&timeZone=America/Mexico_City"
+```
+
+### 7. Filtro combinado para campañas de re-engagement
+
+```bash
+# Usuarios únicos que abandonaron hace más de 5 horas pero menos de 72 horas
+# Ideal para campañas diarias de re-engagement
+curl -H "X-API-Key: rb_your_api_key" \
+  "https://api-rybbit.nexgen.systems/api/analytics/abandonment-data/2?minHoursAgo=5&maxHoursAgo=72&unique_users=true"
+```
+
 ## Respuesta
 
 ### Estructura
@@ -130,7 +158,12 @@ curl -H "X-API-Key: rb_your_api_key" \
   "meta": {
     "site_id": "2",
     "filtered_by_user": true,
-    "date_range": null
+    "date_range": null,
+    "time_filters": {
+      "minHoursAgo": 5,
+      "maxHoursAgo": 48,
+      "timeZone": "America/Mexico_City"
+    }
   }
 }
 ```
