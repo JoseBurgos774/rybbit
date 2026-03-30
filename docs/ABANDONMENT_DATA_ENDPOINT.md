@@ -357,6 +357,7 @@ GET /api/analytics/last-events/:site
 | `eventName` | string | todos | Nombre de evento específico (ej: `"onboarding_abandoned"`) |
 | `startDate` | string | — | Fecha inicio (YYYY-MM-DD) |
 | `endDate` | string | — | Fecha fin (YYYY-MM-DD) |
+| `lastDays` | string | — | Últimos N días (ej: `60` para últimos 2 meses) |
 | `enrichContact` | string | `"true"` | `"false"` para omitir datos de contacto (más rápido) |
 | `limit` | string | `100` | Máximo de resultados (max: 1000) |
 | `offset` | string | `0` | Offset para paginación |
@@ -407,7 +408,21 @@ curl -H "X-API-Key: rb_your_api_key" \
   "https://api-rybbit.nexgen.systems/api/analytics/last-events/2?startDate=2026-03-01&endDate=2026-03-30&limit=500"
 ```
 
-### 6. Sin datos de contacto (más rápido)
+### 6. Último evento de los últimos 60 días (2 meses)
+
+```bash
+curl -H "X-API-Key: rb_your_api_key" \
+  "https://api-rybbit.nexgen.systems/api/analytics/last-events/2?lastDays=60&limit=500"
+```
+
+### 7. Último evento de los últimos 7 días
+
+```bash
+curl -H "X-API-Key: rb_your_api_key" \
+  "https://api-rybbit.nexgen.systems/api/analytics/last-events/2?lastDays=7&limit=500"
+```
+
+### 8. Sin datos de contacto (más rápido)
 
 ```bash
 curl -H "X-API-Key: rb_your_api_key" \

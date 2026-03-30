@@ -45,6 +45,7 @@ export async function getLastEventPerUser(
   const eventName = queryParams.eventName as string | undefined; // filter by specific event name
   const startDate = queryParams.startDate as string | undefined;
   const endDate = queryParams.endDate as string | undefined;
+  const lastDays = queryParams.lastDays ? parseInt(queryParams.lastDays as string) : undefined; // filter last N days
   const enrichContact = queryParams.enrichContact !== "false"; // default true
 
   const limit = Math.max(1, Math.min(1000, limitParam || 100));
@@ -86,6 +87,12 @@ export async function getLastEventPerUser(
     if (endDate) {
       whereConditions.push(`toDate(timestamp) <= {endDate:Date}`);
       params.endDate = endDate;
+    }
+
+    // Filter by last N days (e.g., lastDays=60 for last 2 months)
+    if (lastDays !== undefined && lastDays > 0) {
+      whereConditions.push(`timestamp >= now() - INTERVAL {lastDays:Int32} DAY`);
+      params.lastDays = lastDays;
     }
 
     const whereClause = whereConditions.join(" AND ");
@@ -223,6 +230,7 @@ export async function getLastEventPerUser(
           eventName: eventName || null,
           startDate: startDate || null,
           endDate: endDate || null,
+          lastDays: lastDays || null,
           enrichContact,
         },
       },
