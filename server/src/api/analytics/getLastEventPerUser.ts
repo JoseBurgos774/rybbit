@@ -2,6 +2,7 @@ import { FastifyReply, FastifyRequest } from "fastify";
 import { clickhouse } from "../../db/clickhouse/clickhouse.js";
 import { getUserOrApiKeyHasAccessToSite } from "../../lib/auth-utils.js";
 import { processResults } from "./utils.js";
+import { getEasyOrderUsersByIds } from "../../db/easyorder/easyorder.js";
 import { db } from "../../db/postgres/postgres.js";
 import { trackedUserProfiles } from "../../db/postgres/schema.js";
 import { eq } from "drizzle-orm";
@@ -159,7 +160,7 @@ export async function getLastEventPerUser(
       const userIds = data.map((record) => record.user_id);
       const siteId = Number(site);
 
-      // Get from local tracked_user_profiles
+      // 1. Get from local tracked_user_profiles
       const localProfiles = new Map<
         string,
         { email: string | null; phone: string | null; name: string | null }
@@ -180,13 +181,22 @@ export async function getLastEventPerUser(
         }
       }
 
+      // 2. For users without local profiles, fetch from EasyOrder
+      const userIdsWithoutProfiles = userIds.filter((id) => !localProfiles.has(id));
+      const easyOrderUsers = userIdsWithoutProfiles.length > 0
+        ? await getEasyOrderUsersByIds(userIdsWithoutProfiles)
+        : new Map();
+
+      // 3. Merge contact data into event records
       enrichedData = data.map((record) => {
         const localProfile = localProfiles.get(record.user_id);
+        const easyOrderUser = easyOrderUsers.get(record.user_id);
+
         return {
           ...record,
-          email: localProfile?.email || null,
-          phone: localProfile?.phone || null,
-          name: localProfile?.name || null,
+          email: localProfile?.email || easyOrderUser?.correo_electronico || null,
+          phone: localProfile?.phone || easyOrderUser?.telefono || null,
+          name: localProfile?.name || easyOrderUser?.nombre || null,
         };
       });
     } else {
