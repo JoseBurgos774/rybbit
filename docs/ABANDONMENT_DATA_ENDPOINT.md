@@ -330,9 +330,157 @@ Ahora puedes usar directamente `${email}`, `${phone}` y `${name}` en tus workflo
 | 403 | No autorizado (API Key inválida o sin acceso al sitio) |
 | 500 | Error interno del servidor |
 
+---
+
+# Endpoint: Último Evento por Usuario
+
+## Descripción
+
+Endpoint que devuelve **solamente el último evento de cada usuario** del sitio. Ideal para saber cuál fue la última actividad de todos los usuarios.
+
+## Endpoint
+
+```
+GET /api/analytics/last-events/:site
+```
+
+## Parámetros
+
+### Path Parameters
+- `site` (required): ID del sitio
+
+### Query Parameters
+
+| Parámetro | Tipo | Default | Descripción |
+|-----------|------|---------|-------------|
+| `eventType` | string | todos | Tipo de evento: `"pageview"`, `"custom_event"`, o vacío para todos |
+| `eventName` | string | todos | Nombre de evento específico (ej: `"onboarding_abandoned"`) |
+| `startDate` | string | — | Fecha inicio (YYYY-MM-DD) |
+| `endDate` | string | — | Fecha fin (YYYY-MM-DD) |
+| `enrichContact` | string | `"true"` | `"false"` para omitir datos de contacto (más rápido) |
+| `limit` | string | `100` | Máximo de resultados (max: 1000) |
+| `offset` | string | `0` | Offset para paginación |
+
+## Autenticación
+
+Requiere API Key válida:
+
+```bash
+curl -H "X-API-Key: rb_your_api_key" \
+  "https://api-rybbit.nexgen.systems/api/analytics/last-events/2"
+```
+
+## Ejemplos de Uso
+
+### 1. Último evento de todos los usuarios
+
+```bash
+curl -H "X-API-Key: rb_your_api_key" \
+  "https://api-rybbit.nexgen.systems/api/analytics/last-events/2?limit=500"
+```
+
+### 2. Último pageview de cada usuario
+
+```bash
+curl -H "X-API-Key: rb_your_api_key" \
+  "https://api-rybbit.nexgen.systems/api/analytics/last-events/2?eventType=pageview&limit=500"
+```
+
+### 3. Último evento custom de cada usuario
+
+```bash
+curl -H "X-API-Key: rb_your_api_key" \
+  "https://api-rybbit.nexgen.systems/api/analytics/last-events/2?eventType=custom_event&limit=500"
+```
+
+### 4. Último evento específico (ej: onboarding_abandoned)
+
+```bash
+curl -H "X-API-Key: rb_your_api_key" \
+  "https://api-rybbit.nexgen.systems/api/analytics/last-events/2?eventName=onboarding_abandoned&limit=500"
+```
+
+### 5. Último evento en rango de fechas
+
+```bash
+curl -H "X-API-Key: rb_your_api_key" \
+  "https://api-rybbit.nexgen.systems/api/analytics/last-events/2?startDate=2026-03-01&endDate=2026-03-30&limit=500"
+```
+
+### 6. Sin datos de contacto (más rápido)
+
+```bash
+curl -H "X-API-Key: rb_your_api_key" \
+  "https://api-rybbit.nexgen.systems/api/analytics/last-events/2?enrichContact=false&limit=500"
+```
+
+## Respuesta
+
+```json
+{
+  "data": [
+    {
+      "user_id": "442",
+      "event_name": "onboarding_step_completed",
+      "timestamp": "2026-03-25T14:30:00Z",
+      "pathname": "/onboarding/productos",
+      "hostname": "app.easyorder.app",
+      "browser": "Chrome",
+      "operating_system": "Windows",
+      "country": "MX",
+      "device_type": "desktop",
+      "properties": "{\"step_number\": 6, \"step_name\": \"Productos\"}",
+      "type": "custom_event",
+      "page_title": "Onboarding - Productos",
+      "email": "juan.perez@gmail.com",
+      "phone": "+5216871234567",
+      "name": "Juan Pérez"
+    }
+  ],
+  "pagination": {
+    "total": 245,
+    "limit": 100,
+    "offset": 0,
+    "pages": 3
+  },
+  "meta": {
+    "site_id": "2",
+    "filters": {
+      "eventType": null,
+      "eventName": null,
+      "startDate": null,
+      "endDate": null,
+      "enrichContact": true
+    }
+  }
+}
+```
+
+### Campos de Respuesta
+
+| Campo | Tipo | Descripción |
+|-------|------|-------------|
+| `user_id` | string | ID del usuario |
+| `event_name` | string | Nombre del último evento |
+| `timestamp` | string | Fecha/hora del último evento |
+| `pathname` | string | Ruta de la página |
+| `hostname` | string | Dominio |
+| `browser` | string | Navegador |
+| `operating_system` | string | Sistema operativo |
+| `country` | string | País (código ISO 2 letras) |
+| `device_type` | string | Tipo de dispositivo |
+| `properties` | string | Propiedades del evento (JSON) |
+| `type` | string | Tipo: `pageview` o `custom_event` |
+| `page_title` | string | Título de la página |
+| `email` | string/null | Email del usuario |
+| `phone` | string/null | Teléfono del usuario |
+| `name` | string/null | Nombre del usuario |
+
+---
+
 ## Notas
 
-- El endpoint usa ClickHouse para consultas rápidas
+- Los endpoints usan ClickHouse para consultas rápidas
 - Los datos se filtran automáticamente por `site_id`
 - La paginación es obligatoria para evitar sobrecargas (máx 1000 registros por request)
 - Los timestamps están en UTC

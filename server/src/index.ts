@@ -35,6 +35,7 @@ import { getWeeklyActiveAccounts } from "./api/analytics/getWeeklyActiveAccounts
 import { getOnboardingFunnel } from "./api/analytics/getOnboardingFunnel.js";
 import { getAbandonmentData } from "./api/analytics/getAbandonmentData.js";
 import { getUserOnboardingEvents } from "./api/analytics/getUserOnboardingEvents.js";
+import { getLastEventPerUser } from "./api/analytics/getLastEventPerUser.js";
 import { identifyUser } from "./api/analytics/identifyUser.js";
 import { exportAnalyticsCSV, getAnalyticsSummary, getUserProfiles, getUserContactData } from "./api/analytics/exportAnalyticsCSV.js";
 import { createGoal } from "./api/analytics/goals/createGoal.js";
@@ -192,6 +193,7 @@ const ANALYTICS_ROUTES = [
   "/api/analytics/onboarding-funnel/",
   "/api/analytics/abandonment-data/",
   "/api/analytics/user-onboarding-events/",
+  "/api/analytics/last-events/",
   "/api/analytics/export-csv/",
   "/api/analytics/summary/",
   "/api/analytics/user-profiles/",
@@ -298,6 +300,7 @@ server.get("/api/analytics/weekly-active/:site", getWeeklyActiveAccounts);
 server.get("/api/analytics/onboarding-funnel/:site", getOnboardingFunnel);
 server.get("/api/analytics/abandonment-data/:site", getAbandonmentData);
 server.get("/api/analytics/user-onboarding-events/:site/:user_id", getUserOnboardingEvents);
+server.get("/api/analytics/last-events/:site", getLastEventPerUser);
 
 // User Profile & Export Analytics
 server.post("/api/identify", identifyUser);
