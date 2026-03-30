@@ -89,24 +89,41 @@ export async function getLastEventPerUser(
 
     const whereClause = whereConditions.join(" AND ");
 
-    // Query: get the last event per user using argMax
+    // Query: get the last event per user using ROW_NUMBER window function
+    // First get the latest event per user, then select those rows
     const query = `
       SELECT
         user_id,
-        argMax(event_name, timestamp) as event_name,
-        max(timestamp) as timestamp,
-        argMax(pathname, timestamp) as pathname,
-        argMax(hostname, timestamp) as hostname,
-        argMax(browser, timestamp) as browser,
-        argMax(operating_system, timestamp) as operating_system,
-        argMax(country, timestamp) as country,
-        argMax(device_type, timestamp) as device_type,
-        argMax(toString(props), timestamp) as properties,
-        argMax(type, timestamp) as type,
-        argMax(page_title, timestamp) as page_title
-      FROM events
-      WHERE ${whereClause}
-      GROUP BY user_id
+        event_name,
+        timestamp,
+        pathname,
+        hostname,
+        browser,
+        operating_system,
+        country,
+        device_type,
+        properties,
+        type,
+        page_title
+      FROM (
+        SELECT
+          user_id,
+          event_name,
+          timestamp,
+          pathname,
+          hostname,
+          browser,
+          operating_system,
+          country,
+          device_type,
+          toString(props) as properties,
+          type,
+          page_title,
+          ROW_NUMBER() OVER (PARTITION BY user_id ORDER BY timestamp DESC) as rn
+        FROM events
+        WHERE ${whereClause}
+      )
+      WHERE rn = 1
       ORDER BY timestamp DESC
       LIMIT {limit:Int32} OFFSET {offset:Int32}
     `;
